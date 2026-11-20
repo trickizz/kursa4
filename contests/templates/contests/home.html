@@ -1,21 +1,76 @@
 {% extends 'contests/base.html' %}
 {% block title %}Главная{% endblock %}
 {% block content %}
-<h1 class="mb-4">Добро пожаловать!</h1>
-<h3>Активные конкурсы</h3>
-<div class="row">
+<section class="hero fade-up">
+    <div class="row align-items-center g-4">
+        <div class="col-lg-8">
+            <h1 class="mb-3">Конкурсы проектов,<br>в которых хочется участвовать</h1>
+            <p class="lead mb-4">Подавайте идеи, получайте оценки экспертов и поддержку наставников, следите за статусом проекта и голосуйте за лучшие работы.</p>
+            <div class="d-flex flex-wrap gap-2">
+                {% if user.is_authenticated %}
+                    {% if is_participant %}<a href="{% url 'project_create' %}" class="btn btn-light btn-lg"><i class="bi bi-rocket-takeoff me-2"></i>Подать проект</a>{% endif %}
+                    <a href="{% url 'contest_list' %}" class="btn btn-primary btn-lg"><i class="bi bi-trophy me-2"></i>Смотреть конкурсы</a>
+                {% else %}
+                    <a href="{% url 'register' %}" class="btn btn-light btn-lg"><i class="bi bi-person-plus me-2"></i>Присоединиться</a>
+                    <a href="{% url 'contest_list' %}" class="btn btn-primary btn-lg"><i class="bi bi-trophy me-2"></i>Смотреть конкурсы</a>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="d-flex flex-column gap-2 align-items-lg-end">
+                <span class="hero-chip"><i class="bi bi-trophy-fill"></i>{{ stats.contests }} активных конкурсов</span>
+                <span class="hero-chip"><i class="bi bi-rocket-fill"></i>{{ stats.projects }} проектов на конкурсах</span>
+                <span class="hero-chip"><i class="bi bi-people-fill"></i>{{ stats.members }} участников платформы</span>
+                <span class="hero-chip"><i class="bi bi-star-fill"></i>{{ stats.evaluations }} экспертных оценок</span>
+            </div>
+        </div>
+    </div>
+</section>
+<div class="section-title"><i class="bi bi-lightning-charge-fill"></i><h2 class="h4 mb-0">Активные конкурсы</h2></div>
+<div class="row g-4 mb-5">
     {% for contest in contests %}
-    <div class="col-md-4 mb-3">
-        <div class="card">
-            <div class="card-body">
-                <h5>{{ contest.name }}</h5>
-                <p>{{ contest.description|truncatechars:100 }}</p>
-                <a href="{% url 'contest_detail' contest.pk %}" class="btn btn-primary">Подробнее</a>
+    <div class="col-md-6 col-lg-4">
+        <div class="card card-hover fade-up h-100">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="meta-chip"><i class="bi bi-calendar-event"></i>{{ contest.start_date|date:"d.m.Y" }} — {{ contest.end_date|date:"d.m.Y" }}</span>
+                    <span class="meta-chip"><i class="bi bi-folder2"></i>{{ contest.project_count }}</span>
+                </div>
+                <h5 class="mt-1">{{ contest.name }}</h5>
+                <p class="text-muted flex-grow-1" style="font-size:.9rem">{{ contest.description|truncatechars:120 }}</p>
+                <a href="{% url 'contest_detail' contest.pk %}" class="btn btn-soft mt-2 stretched-link">Подробнее <i class="bi bi-arrow-right ms-1"></i></a>
             </div>
         </div>
     </div>
     {% empty %}
-    <p>Активных конкурсов нет.</p>
+    <div class="col-12"><div class="card"><div class="empty-state">
+        <div class="es-icon"><i class="bi bi-trophy"></i></div>
+        <h5>Активных конкурсов пока нет</h5>
+        <p>Организаторы скоро откроют приём заявок — загляните позже.</p>
+    </div></div></div>
     {% endfor %}
+</div>
+<div class="section-title"><i class="bi bi-signpost-split-fill"></i><h2 class="h4 mb-0">Как это работает</h2></div>
+<div class="row g-4">
+    <div class="col-md-6 col-lg-3"><div class="card card-hover fade-up h-100"><div class="card-body text-center">
+        <div class="stat-icon i-indigo mx-auto mb-3"><i class="bi bi-person-plus"></i></div>
+        <h6 class="fw-bold">1. Зарегистрируйтесь</h6>
+        <p class="text-muted mb-0" style="font-size:.85rem">Выберите роль: участник, наставник или эксперт. Организаторов назначает администратор.</p>
+    </div></div></div>
+    <div class="col-md-6 col-lg-3"><div class="card card-hover fade-up h-100"><div class="card-body text-center">
+        <div class="stat-icon i-sky mx-auto mb-3"><i class="bi bi-rocket-takeoff"></i></div>
+        <h6 class="fw-bold">2. Подайте проект</h6>
+        <p class="text-muted mb-0" style="font-size:.85rem">Создайте черновик, загрузите документы и отправьте работу на выбранный конкурс.</p>
+    </div></div></div>
+    <div class="col-md-6 col-lg-3"><div class="card card-hover fade-up h-100"><div class="card-body text-center">
+        <div class="stat-icon i-amber mx-auto mb-3"><i class="bi bi-clipboard-check"></i></div>
+        <h6 class="fw-bold">3. Пройдите экспертизу</h6>
+        <p class="text-muted mb-0" style="font-size:.85rem">Эксперты оценят проект по критериям, а наставник поможет его доработать.</p>
+    </div></div></div>
+    <div class="col-md-6 col-lg-3"><div class="card card-hover fade-up h-100"><div class="card-body text-center">
+        <div class="stat-icon i-green mx-auto mb-3"><i class="bi bi-trophy"></i></div>
+        <h6 class="fw-bold">4. Победите</h6>
+        <p class="text-muted mb-0" style="font-size:.85rem">Набирайте голоса и баллы, следите за статусом и доведите проект до завершения.</p>
+    </div></div></div>
 </div>
 {% endblock %}
