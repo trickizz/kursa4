@@ -1,33 +1,48 @@
 from django.contrib.auth.mixins import UserPassesTestMixin
+from django.contrib.auth.views import redirect_to_login
 from django.shortcuts import redirect
 from django.contrib import messages
 
+from .roles import (has_role, ROLE_PARTICIPANT, ROLE_MENTOR, ROLE_EXPERT,
+                    ROLE_ORGANIZER, ROLE_ADMIN)
 
-class OrganizerRequiredMixin(UserPassesTestMixin):
+
+class RoleRequiredMixin(UserPassesTestMixin):
+    """Базовый миксин: пускает пользователей с одной из required_roles.
+    Администратор и суперпользователь проходят любую проверку."""
+    required_roles = ()
+    permission_message = 'У вас нет прав для просмотра этой страницы.'
+
     def test_func(self):
-        return (self.request.user.groups.filter(name='Organizer').exists()
-                or self.request.user.is_superuser)
+        return has_role(self.request.user, *self.required_roles)
 
     def handle_no_permission(self):
-        messages.error(self.request, 'Доступ только для организаторов')
+        if not self.request.user.is_authenticated:
+            return redirect_to_login(self.request.get_full_path())
+        messages.error(self.request, self.permission_message)
         return redirect('home')
 
 
-class ExpertRequiredMixin(UserPassesTestMixin):
-    def test_func(self):
-        return (self.request.user.groups.filter(name='Expert').exists()
-                or self.request.user.is_superuser)
-
-    def handle_no_permission(self):
-        messages.error(self.request, 'Доступ только для экспертов')
-        return redirect('home')
+class OrganizerRequiredMixin(RoleRequiredMixin):
+    required_roles = (ROLE_ORGANIZER,)
+    permission_message = 'Доступ только для организаторов и администраторов.'
 
 
-class ParticipantRequiredMixin(UserPassesTestMixin):
-    def test_func(self):
-        return (self.request.user.groups.filter(name='Participant').exists()
-                or self.request.user.is_superuser)
+class ExpertRequiredMixin(RoleRequiredMixin):
+    required_roles = (ROLE_EXPERT,)
+    permission_message = 'Доступ только для экспертов и администраторов.'
 
-    def handle_no_permission(self):
-        messages.error(self.request, 'Доступ только для участников')
-        return redirect('home')
+
+class ParticipantRequiredMixin(RoleRequiredMixin):
+    required_roles = (ROLE_PARTICIPANT,)
+    permission_message = 'Доступ только для участников и администраторов.'
+
+
+class MentorRequiredMixin(RoleRequiredMixin):
+    required_roles = (ROLE_MENTOR,)
+    permission_message = 'Доступ только для наставников и администраторов.'
+
+
+class AdminRequiredMixin(RoleRequiredMixin):
+    required_roles = (ROLE_ADMIN,)
+    permission_message = 'Доступ только для администраторов.'

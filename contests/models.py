@@ -86,6 +86,13 @@ class Project(models.Model):
             return round(sum(e.score for e in evaluations) / evaluations.count(), 2)
         return 0
 
+    def evaluations_count(self):
+        return self.evaluations.count()
+
+    def is_editable_by_participant(self):
+        """Участник может редактировать/подавать только черновик или отклонённый проект."""
+        return self.status in ('draft', 'rejected')
+
 
 class Criterion(models.Model):
     contest = models.ForeignKey(Contest, on_delete=models.CASCADE,
@@ -151,3 +158,19 @@ class Document(models.Model):
 
     def __str__(self):
         return f'{self.project.title} — {self.description}'
+
+class ProjectVote(models.Model):
+    """Голос пользователя за проект: один пользователь — один голос."""
+    project = models.ForeignKey(Project, on_delete=models.CASCADE,
+                                related_name='project_votes', verbose_name='Проект')
+    user = models.ForeignKey(User, on_delete=models.CASCADE,
+                             related_name='project_votes', verbose_name='Пользователь')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Голос'
+        verbose_name_plural = 'Голоса'
+        unique_together = ['project', 'user']
+
+    def __str__(self):
+        return f'{self.user.username} → {self.project.title}'

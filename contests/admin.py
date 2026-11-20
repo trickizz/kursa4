@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Contest, Stage, Project, Criterion, Evaluation, Comment, Document
+from .models import Contest, Stage, Project, Criterion, Evaluation, Comment, Document, ProjectVote
 
 
 @admin.register(Contest)
@@ -17,7 +17,7 @@ class StageAdmin(admin.ModelAdmin):
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ['title', 'contest', 'participant', 'mentor', 'status']
+    list_display = ['title', 'contest', 'participant', 'mentor', 'status', 'votes']
     list_filter = ['status', 'contest']
     search_fields = ['title', 'summary']
     list_editable = ['status']
@@ -44,3 +44,8 @@ class CommentAdmin(admin.ModelAdmin):
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
     list_display = ['project', 'description', 'uploaded_at']
+
+@admin.register(ProjectVote)
+class ProjectVoteAdmin(admin.ModelAdmin):
+    list_display = ['project', 'user', 'created_at']
+    list_filter = ['user']

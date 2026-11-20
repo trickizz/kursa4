@@ -40,6 +40,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'contests.context_processors.roles',
             ],
         },
     },
@@ -73,6 +74,10 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# error -> bootstrap danger
+from django.contrib.messages import constants as message_constants
+MESSAGE_TAGS = {message_constants.ERROR: 'danger'}
+
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
@@ -80,7 +85,33 @@ LOGOUT_REDIRECT_URL = '/'
 JAZZMIN_SETTINGS = {
     "site_title": "Панель управления",
     "site_header": "Панель управления",
-    "site_brand": "Конкурсы проектов",
+    "site_brand": "🏆 Конкурсы проектов",
     "welcome_sign": "Добро пожаловать в панель управления",
     "copyright": "Курсовой проект, 2026",
+    "show_sidebar": True,
+    "navigation_expanded": True,
+    "icons": {
+        "auth": "fas fa-users-cog",
+        "auth.user": "fas fa-user",
+        "auth.Group": "fas fa-user-tag",
+        "contests.Contest": "fas fa-trophy",
+        "contests.Stage": "fas fa-list-ol",
+        "contests.Project": "fas fa-rocket",
+        "contests.Criterion": "fas fa-check-double",
+        "contests.Evaluation": "fas fa-star",
+        "contests.Comment": "fas fa-comments",
+        "contests.Document": "fas fa-file-alt",
+        "contests.ProjectVote": "fas fa-heart",
+    },
+}
+
+JAZZMIN_UI_TWEAKS = {
+    "navbar": "navbar-indigo navbar-dark",
+    "sidebar": "sidebar-dark-indigo",
+    "accent": "accent-indigo",
+    "brand_colour": "navbar-indigo",
+    "button_classes": {
+        "primary": "btn-primary",
+        "secondary": "btn-secondary",
+    },
 }
