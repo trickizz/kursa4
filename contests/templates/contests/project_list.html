@@ -1,19 +1,61 @@
 {% extends 'contests/base.html' %}
+{% load query_utils %}
 {% block title %}Проекты{% endblock %}
 {% block content %}
-<h2>Проекты</h2>
-<div class="row">
+<div class="page-head">
+    <div><h1><i class="bi bi-rocket text-primary me-1"></i>Проекты</h1><p class="page-sub">Работы участников всех конкурсов</p></div>
+    {% if is_participant %}<a href="{% url 'project_create' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Создать проект</a>{% endif %}
+</div>
+<form class="filter-bar" method="get">
+    <div class="row g-2">
+        <div class="col-md-4"><input type="text" name="q" value="{{ q }}" class="form-control" placeholder="🔍 Поиск проекта..."></div>
+        <div class="col-md-3">
+            <select name="contest" class="form-select">
+                <option value="">Все конкурсы</option>
+                {% for c in contests %}<option value="{{ c.pk }}" {% if current_contest == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select name="status" class="form-select">
+                <option value="">Все статусы</option>
+                {% for code, label in status_choices %}<option value="{{ code }}" {% if current_status == code %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2 d-grid"><button class="btn btn-soft"><i class="bi bi-funnel me-1"></i>Фильтр</button></div>
+    </div>
+</form>
+<div class="row g-4">
     {% for project in projects %}
-    <div class="col-md-4 mb-3">
-        <div class="card"><div class="card-body">
+    <div class="col-md-6 col-lg-4">
+        <div class="card card-hover fade-up h-100"><div class="card-body d-flex flex-column">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <span class="status-badge status-{{ project.status }}">{{ project.get_status_display }}</span>
+                <span class="meta-chip"><i class="bi bi-heart-fill text-danger"></i>{{ project.votes }}</span>
+            </div>
             <h5>{{ project.title }}</h5>
-            <p>{{ project.summary|truncatechars:80 }}</p>
-            <p><small>Статус: {{ project.get_status_display }}</small></p>
-            <a href="{% url 'project_detail' project.pk %}" class="btn btn-outline-primary btn-sm">Подробнее</a>
+            <p class="text-muted flex-grow-1" style="font-size:.9rem">{{ project.summary|truncatechars:110 }}</p>
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                <span class="meta-chip"><i class="bi bi-trophy"></i>{{ project.contest.name|truncatechars:22 }}</span>
+                <span class="meta-chip"><i class="bi bi-person"></i>{{ project.participant.username }}</span>
+                <span class="meta-chip"><i class="bi bi-star-fill text-warning"></i>{{ project.average_score }}</span>
+            </div>
+            <a href="{% url 'project_detail' project.pk %}" class="btn btn-soft btn-sm stretched-link">Открыть проект <i class="bi bi-arrow-right"></i></a>
         </div></div>
     </div>
     {% empty %}
-    <p>Проектов нет.</p>
+    <div class="col-12"><div class="card"><div class="empty-state">
+        <div class="es-icon"><i class="bi bi-rocket"></i></div>
+        <h5>Проектов не найдено</h5>
+        <p>{% if q or current_contest or current_status %}Попробуйте сбросить фильтры.{% else %}Пока никто не подал проект на конкурс.{% endif %}</p>
+        {% if is_participant %}<a href="{% url 'project_create' %}" class="btn btn-primary"><i class="bi bi-rocket-takeoff me-1"></i>Подать первый проект</a>{% endif %}
+    </div></div></div>
     {% endfor %}
 </div>
+{% if is_paginated %}
+<nav class="mt-4 d-flex justify-content-center"><ul class="pagination">
+    {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?{% modify_query page=page_obj.previous_page_number %}"><i class="bi bi-chevron-left"></i></a></li>{% endif %}
+    {% for num in paginator.page_range %}<li class="page-item {% if page_obj.number == num %}active{% endif %}"><a class="page-link" href="?{% modify_query page=num %}">{{ num }}</a></li>{% endfor %}
+    {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?{% modify_query page=page_obj.next_page_number %}"><i class="bi bi-chevron-right"></i></a></li>{% endif %}
+</ul></nav>
+{% endif %}
 {% endblock %}
