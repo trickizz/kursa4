@@ -70,7 +70,7 @@ class ContestListView(ListView):
     paginate_by = 9
 
     def get_queryset(self):
-        queryset = Contest.objects.annotate(project_count=Count('projects'))
+        queryset = Contest.objects.annotate(project_count=Count('projects')).order_by('-created_at')
         query = self.request.GET.get('q', '').strip()
         if query:
             queryset = queryset.filter(
@@ -107,7 +107,8 @@ class ProjectListView(ListView):
 
     def get_queryset(self):
         queryset = (Project.objects.exclude(status='draft')
-                    .select_related('contest', 'participant'))
+                    .select_related('contest', 'participant')
+                    .order_by('-created_at'))
         contest_id = self.request.GET.get('contest')
         status = self.request.GET.get('status')
         query = self.request.GET.get('q', '').strip()
