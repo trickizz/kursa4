@@ -7,7 +7,6 @@ DEBUG = True
 ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
-    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -45,6 +44,13 @@ TEMPLATES = [
         },
     },
 ]
+
+# Тема админ-панели Jazzmin подключается, если пакет установлен (см. requirements.txt)
+try:
+    import jazzmin  # noqa: F401
+    INSTALLED_APPS.insert(0, 'jazzmin')
+except ImportError:
+    pass
 
 WSGI_APPLICATION = 'contest_project.wsgi.application'
 

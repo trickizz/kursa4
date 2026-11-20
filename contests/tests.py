@@ -102,7 +102,7 @@ class PlatformTests(TestCase):
         self.student.refresh_from_db()
         self.assertTrue(self.student.groups.filter(name=ROLE_EXPERT).exists())
         self.assertFalse(self.student.groups.filter(name=ROLE_PARTICIPANT).exists())
-        # права изменились: evaluación доступна, создание проекта — нет
+        # права изменились: оценка доступна, создание проекта — нет
         self.login(self.student)
         self.assertEqual(self.client.get(reverse('evaluation_create')).status_code, 200)
         self.assertRedirects(self.client.get(reverse('project_create')), reverse('home'))
