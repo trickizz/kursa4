@@ -1,11 +1,33 @@
 {% extends 'contests/base.html' %}
+{% block title %}Мои оценки{% endblock %}
 {% block content %}
-<h2>Мои оценки</h2>
-<ul>
-    {% for e in evaluations %}
-        <li>{{ e.project.title }} — {{ e.criterion.name }}: {{ e.score }}</li>
-    {% empty %}
-        <li>Оценок нет.</li>
-    {% endfor %}
-</ul>
+<div class="page-head">
+    <div><h1><i class="bi bi-clipboard-check text-primary me-2"></i>Мои оценки</h1><p class="page-sub">Все выставленные вами баллы</p></div>
+    <a href="{% url 'evaluation_create' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Выставить оценку</a>
+</div>
+{% if evaluations %}
+<div class="card fade-up"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-clean">
+        <thead><tr><th>Проект</th><th>Критерий</th><th>Балл</th><th>Комментарий</th><th>Дата</th></tr></thead>
+        <tbody>
+        {% for e in evaluations %}
+        <tr>
+            <td><a href="{% url 'project_detail' e.project.pk %}" class="fw-bold text-dark">{{ e.project.title }}</a></td>
+            <td>{{ e.criterion.name }}</td>
+            <td><span class="score-pill">{{ e.score }} / {{ e.criterion.max_score }}</span></td>
+            <td class="text-muted" style="font-size:.85rem">{{ e.comment|default:"—" }}</td>
+            <td class="comment-meta">{{ e.created_at|date:"d.m.Y" }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div></div></div>
+{% else %}
+<div class="card"><div class="empty-state">
+    <div class="es-icon"><i class="bi bi-clipboard"></i></div>
+    <h5>Вы ещё не выставили ни одной оценки</h5>
+    <p>Откройте любой поданный проект и нажмите «Оценить проект».</p>
+    <a href="{% url 'project_list' %}" class="btn btn-primary"><i class="bi bi-rocket me-1"></i>К списку проектов</a>
+</div></div>
+{% endif %}
 {% endblock %}

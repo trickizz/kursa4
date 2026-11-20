@@ -1,9 +1,16 @@
 {% extends 'contests/base.html' %}
+{% block title %}Удаление проекта{% endblock %}
 {% block content %}
-<h2>Удалить проект "{{ object.title }}"?</h2>
-<form method="post">
-    {% csrf_token %}
-    <button class="btn btn-danger">Удалить</button>
-    <a href="{% url 'project_list' %}" class="btn btn-secondary">Отмена</a>
-</form>
+<div class="row justify-content-center"><div class="col-lg-5">
+    <div class="card fade-up text-center"><div class="card-body p-4">
+        <div class="mx-auto mb-3" style="width:74px;height:74px;border-radius:24px;background:#fee2e2;color:#b91c1c;display:flex;align-items:center;justify-content:center;font-size:2rem"><i class="bi bi-trash"></i></div>
+        <h4>Удалить проект?</h4>
+        <p class="text-muted">«{{ object.title }}», его оценки, комментарии и документы будут удалены безвозвратно.</p>
+        <form method="post" class="d-flex gap-2 justify-content-center mt-4">
+            {% csrf_token %}
+            <a href="{% url 'project_detail' object.pk %}" class="btn btn-soft">Отмена</a>
+            <button class="btn btn-danger"><i class="bi bi-trash me-1"></i>Да, удалить</button>
+        </form>
+    </div></div>
+</div></div>
 {% endblock %}

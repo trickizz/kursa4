@@ -1,11 +1,39 @@
 {% extends 'contests/base.html' %}
+{% block title %}Мои проекты{% endblock %}
 {% block content %}
-<h2>Мои проекты</h2>
-<ul>
-    {% for p in projects %}
-        <li><a href="{% url 'project_detail' p.pk %}">{{ p.title }}</a> — {{ p.get_status_display }}</li>
-    {% empty %}
-        <li>Проектов нет.</li>
-    {% endfor %}
-</ul>
+<div class="page-head">
+    <div><h1><i class="bi bi-folder2 text-primary me-2"></i>Мои проекты</h1><p class="page-sub">Черновики и поданные работы</p></div>
+    <a href="{% url 'project_create' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Создать проект</a>
+</div>
+{% if projects %}
+<div class="card fade-up"><div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-clean">
+        <thead><tr><th>Проект</th><th>Конкурс</th><th>Статус</th><th>Наставник</th><th class="text-end">Балл / Голоса</th><th></th></tr></thead>
+        <tbody>
+        {% for p in projects %}
+        <tr>
+            <td><a href="{% url 'project_detail' p.pk %}" class="fw-bold text-dark">{{ p.title }}</a></td>
+            <td style="font-size:.85rem">{{ p.contest.name|truncatechars:28 }}</td>
+            <td><span class="status-badge status-{{ p.status }}">{{ p.get_status_display }}</span></td>
+            <td style="font-size:.85rem">{{ p.mentor.username|default:"—" }}</td>
+            <td class="text-end"><span class="score-pill me-1"><i class="bi bi-star-fill text-warning me-1"></i>{{ p.average_score }}</span><span class="meta-chip"><i class="bi bi-heart-fill text-danger"></i>{{ p.votes }}</span></td>
+            <td class="text-end">
+                {% if p.status == 'draft' or p.status == 'rejected' %}
+                    <a href="{% url 'project_submit' p.pk %}" class="btn btn-soft-success btn-sm" title="Отправить на конкурс"><i class="bi bi-send"></i></a>
+                    <a href="{% url 'project_edit' p.pk %}" class="btn btn-soft btn-sm" title="Редактировать"><i class="bi bi-pencil"></i></a>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div></div></div>
+{% else %}
+<div class="card"><div class="empty-state">
+    <div class="es-icon"><i class="bi bi-folder2-open"></i></div>
+    <h5>У вас пока нет проектов</h5>
+    <p>Создайте первый проект и подайте его на конкурс!</p>
+    <a href="{% url 'project_create' %}" class="btn btn-primary"><i class="bi bi-rocket-takeoff me-1"></i>Создать проект</a>
+</div></div>
+{% endif %}
 {% endblock %}
