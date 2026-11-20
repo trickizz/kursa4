@@ -219,6 +219,7 @@ class StageCreateView(LoginRequiredMixin, OrganizerRequiredMixin, CreateView):
 
     def form_valid(self, form):
         form.instance.contest = self.contest
+        self.object = form.save()
         messages.success(self.request, 'Этап добавлен.')
         return redirect('contest_detail', pk=self.contest.pk)
 
@@ -253,6 +254,7 @@ class CriterionCreateView(LoginRequiredMixin, OrganizerRequiredMixin, CreateView
 
     def form_valid(self, form):
         form.instance.contest = self.contest
+        self.object = form.save()
         messages.success(self.request, 'Критерий добавлен.')
         return redirect('contest_detail', pk=self.contest.pk)
 

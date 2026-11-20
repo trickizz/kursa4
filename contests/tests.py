@@ -171,7 +171,8 @@ class PlatformTests(TestCase):
     def test_edit_permissions(self):
         url = reverse('project_edit', args=[self.draft.pk])
         self.login(self.student2)
-        self.assertRedirects(self.client.get(url), reverse('project_detail', args=[self.draft.pk]))
+        self.assertRedirects(self.client.get(url), reverse('project_detail', args=[self.draft.pk]),
+                             fetch_redirect_response=False)
         self.login(self.student)
         self.assertEqual(self.client.get(url).status_code, 200)
         # после подачи редактирование запрещено автору
@@ -183,7 +184,8 @@ class PlatformTests(TestCase):
     def test_submit_only_owner_and_once(self):
         url = reverse('project_submit', args=[self.draft.pk])
         self.login(self.student2)
-        self.assertRedirects(self.client.post(url), reverse('project_detail', args=[self.draft.pk]))
+        self.assertRedirects(self.client.post(url), reverse('project_detail', args=[self.draft.pk]),
+                             fetch_redirect_response=False)
         self.draft.refresh_from_db()
         self.assertEqual(self.draft.status, 'draft')
         self.login(self.student)
