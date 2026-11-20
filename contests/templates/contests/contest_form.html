@@ -1,9 +1,36 @@
 {% extends 'contests/base.html' %}
+{% block title %}{% if object %}Редактирование конкурса{% else %}Новый конкурс{% endif %}{% endblock %}
 {% block content %}
-<h2>{% if object %}Редактировать{% else %}Создать{% endif %} конкурс</h2>
-<form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button class="btn btn-primary">Сохранить</button>
-</form>
+<div class="row justify-content-center"><div class="col-lg-7">
+    <div class="card fade-up">
+        <div class="card-header grad d-flex justify-content-between align-items-center">
+            <h4 class="mb-0"><i class="bi bi-trophy me-2"></i>{% if object %}Редактировать конкурс{% else %}Новый конкурс{% endif %}</h4>
+            <a href="{% url 'contest_list' %}" class="btn btn-light btn-sm"><i class="bi bi-x-lg"></i></a>
+        </div>
+        <div class="card-body p-4">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+                {% for field in form %}
+                    {% if field.name == 'is_active' %}
+                        <div class="form-check form-switch mb-3">
+                            {{ field }}<label class="form-check-label fw-bold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            <div class="form-text">Неактивные конкурсы скрыты с главной страницы.</div>
+                        </div>
+                    {% else %}
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.errors %}<div class="text-danger small mt-1 fw-semibold">{{ field.errors }}</div>{% endif %}
+                        </div>
+                    {% endif %}
+                {% endfor %}
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{% if object %}{% url 'contest_detail' object.pk %}{% else %}{% url 'contest_list' %}{% endif %}" class="btn btn-soft">Отмена</a>
+                    <button class="btn btn-primary px-4"><i class="bi bi-check-lg me-1"></i>Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div></div>
 {% endblock %}

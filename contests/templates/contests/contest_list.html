@@ -1,23 +1,52 @@
 {% extends 'contests/base.html' %}
+{% load query_utils %}
 {% block title %}Конкурсы{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between mb-3">
-    <h2>Конкурсы</h2>
-    {% if user.groups.first.name == 'Organizer' or user.is_superuser %}
-        <a href="{% url 'contest_create' %}" class="btn btn-primary">Создать конкурс</a>
-    {% endif %}
+<div class="page-head">
+    <div><h1><i class="bi bi-trophy text-primary me-2"></i>Конкурсы</h1><p class="page-sub">Выберите конкурс и подайте свой проект</p></div>
+    {% if can_manage %}<a href="{% url 'contest_create' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Создать конкурс</a>{% endif %}
 </div>
-<div class="row">
+<form class="filter-bar" method="get">
+    <div class="row g-2 align-items-center">
+        <div class="col-md-9">
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0" style="border-radius:12px 0 0 12px"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" name="q" value="{{ q }}" class="form-control border-start-0" placeholder="Поиск по названию или описанию...">
+            </div>
+        </div>
+        <div class="col-md-3 d-grid"><button class="btn btn-soft"><i class="bi bi-funnel me-1"></i>Найти</button></div>
+    </div>
+</form>
+<div class="row g-4">
     {% for contest in contests %}
-    <div class="col-md-4 mb-3">
-        <div class="card"><div class="card-body">
+    <div class="col-md-6 col-lg-4">
+        <div class="card card-hover fade-up h-100"><div class="card-body d-flex flex-column">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                {% if contest.is_active %}<span class="status-badge status-completed">Активен</span>{% else %}<span class="status-badge status-draft">Завершён</span>{% endif %}
+                <span class="meta-chip"><i class="bi bi-folder2"></i>{{ contest.project_count }} проектов</span>
+            </div>
             <h5>{{ contest.name }}</h5>
-            <p>{{ contest.description|truncatechars:100 }}</p>
-            <a href="{% url 'contest_detail' contest.pk %}" class="btn btn-outline-primary btn-sm">Подробнее</a>
+            <p class="text-muted flex-grow-1" style="font-size:.9rem">{{ contest.description|truncatechars:130 }}</p>
+            <div class="d-flex justify-content-between align-items-center mt-2">
+                <span class="meta-chip"><i class="bi bi-calendar-event"></i>до {{ contest.end_date|date:"d.m.Y" }}</span>
+                <a href="{% url 'contest_detail' contest.pk %}" class="btn btn-soft btn-sm stretched-link">Подробнее <i class="bi bi-arrow-right"></i></a>
+            </div>
         </div></div>
     </div>
     {% empty %}
-    <p>Конкурсов нет.</p>
+    <div class="col-12"><div class="card"><div class="empty-state">
+        <div class="es-icon"><i class="bi bi-trophy"></i></div>
+        <h5>Конкурсов не найдено</h5>
+        <p>{% if q %}Попробуйте изменить поисковый запрос.{% else %}Пока никто не создал конкурс.{% endif %}</p>
+        {% if can_manage %}<a href="{% url 'contest_create' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Создать первый конкурс</a>{% endif %}
+    </div></div></div>
     {% endfor %}
 </div>
+{% if is_paginated %}
+<nav class="mt-4 d-flex justify-content-center"><ul class="pagination">
+    {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?{% modify_query page=page_obj.previous_page_number %}"><i class="bi bi-chevron-left"></i></a></li>{% endif %}
+    {% for num in paginator.page_range %}<li class="page-item {% if page_obj.number == num %}active{% endif %}"><a class="page-link" href="?{% modify_query page=num %}">{{ num }}</a></li>{% endfor %}
+    {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?{% modify_query page=page_obj.next_page_number %}"><i class="bi bi-chevron-right"></i></a></li>{% endif %}
+</ul></nav>
+{% endif %}
 {% endblock %}
