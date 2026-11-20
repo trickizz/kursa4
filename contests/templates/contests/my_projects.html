@@ -1,0 +1,11 @@
+{% extends 'contests/base.html' %}
+{% block content %}
+<h2>Мои проекты</h2>
+<ul>
+    {% for p in projects %}
+        <li><a href="{% url 'project_detail' p.pk %}">{{ p.title }}</a> — {{ p.get_status_display }}</li>
+    {% empty %}
+        <li>Проектов нет.</li>
+    {% endfor %}
+</ul>
+{% endblock %}

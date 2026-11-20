@@ -1,0 +1,39 @@
+{% extends 'contests/base.html' %}
+{% block title %}Вход{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">🔐 Вход в систему</h4>
+                <a href="{% url 'home' %}" class="btn btn-light btn-sm" title="На главную">✕</a>
+            </div>
+            <div class="card-body p-4">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {% if form.errors %}
+                        <div class="alert alert-danger">Неверный логин или пароль.</div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label for="id_username" class="form-label fw-semibold">Логин <span class="text-danger">*</span></label>
+                        <input type="text" name="username" id="id_username" class="form-control" required autofocus placeholder="Введите логин">
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_password" class="form-label fw-semibold">Пароль <span class="text-danger">*</span></label>
+                        <input type="password" name="password" id="id_password" class="form-control" required placeholder="Введите пароль">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 py-2">Войти</button>
+                </form>
+
+                <hr class="my-4">
+                <div class="text-center">
+                    <p class="text-muted mb-2">Нет аккаунта?</p>
+                    <a href="{% url 'register' %}" class="btn btn-outline-primary">📝 Зарегистрироваться</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

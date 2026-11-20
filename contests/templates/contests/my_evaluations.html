@@ -1,0 +1,11 @@
+{% extends 'contests/base.html' %}
+{% block content %}
+<h2>Мои оценки</h2>
+<ul>
+    {% for e in evaluations %}
+        <li>{{ e.project.title }} — {{ e.criterion.name }}: {{ e.score }}</li>
+    {% empty %}
+        <li>Оценок нет.</li>
+    {% endfor %}
+</ul>
+{% endblock %}

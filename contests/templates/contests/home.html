@@ -1,0 +1,21 @@
+{% extends 'contests/base.html' %}
+{% block title %}Главная{% endblock %}
+{% block content %}
+<h1 class="mb-4">Добро пожаловать!</h1>
+<h3>Активные конкурсы</h3>
+<div class="row">
+    {% for contest in contests %}
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5>{{ contest.name }}</h5>
+                <p>{{ contest.description|truncatechars:100 }}</p>
+                <a href="{% url 'contest_detail' contest.pk %}" class="btn btn-primary">Подробнее</a>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <p>Активных конкурсов нет.</p>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends 'contests/base.html' %}
+{% block content %}
+<h2>Отправить проект "{{ object.title }}" на конкурс?</h2>
+<p>После отправки редактирование будет недоступно.</p>
+<form method="post">
+    {% csrf_token %}
+    <button class="btn btn-success">Да, отправить</button>
+    <a href="{% url 'project_detail' object.pk %}" class="btn btn-secondary">Отмена</a>
+</form>
+{% endblock %}

@@ -1,0 +1,170 @@
+{% extends 'contests/base.html' %}
+{% block title %}{{ project.title }}{% endblock %}
+
+{% block content %}
+<h1>{{ project.title }}</h1>
+<p>{{ project.summary }}</p>
+
+<p>
+    <strong>Статус:</strong>
+    <span id="status-display" class="badge bg-secondary">{{ project.get_status_display }}</span>
+</p>
+
+<p>
+    <strong>Средний балл:</strong> {{ project.average_score }}
+    |
+    <strong>Голосов:</strong> <span id="votes-count">{{ project.votes }}</span>
+</p>
+
+{% if user.is_authenticated %}
+    <button id="vote-btn" class="btn btn-primary btn-sm" data-project-id="{{ project.pk }}">
+        Голосовать
+    </button>
+{% endif %}
+
+{% if user.is_authenticated and user.groups.first.name == 'Organizer' or user.is_superuser %}
+    <div class="mt-3">
+        <label for="status-select" class="form-label">Изменить статус:</label>
+        <select id="status-select" class="form-select w-auto" data-project-id="{{ project.pk }}">
+            {% for code, label in project.STATUS_CHOICES %}
+                <option value="{{ code }}" {% if project.status == code %}selected{% endif %}>
+                    {{ label }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+{% endif %}
+
+<hr>
+
+<h4>Оценки экспертов</h4>
+<ul>
+    {% for e in evaluations %}
+        <li>{{ e.criterion.name }}: {{ e.score }} — {{ e.comment }}</li>
+    {% empty %}
+        <li>Оценок пока нет.</li>
+    {% endfor %}
+</ul>
+
+<h4>Комментарии</h4>
+<ul id="comments-list">
+    {% for c in comments %}
+        <li>
+            <strong>{{ c.author.username }}:</strong> {{ c.text }}
+            <small class="text-muted">{{ c.created_at|date:"d.m.Y H:i" }}</small>
+        </li>
+    {% empty %}
+        <li id="no-comments">Комментариев нет.</li>
+    {% endfor %}
+</ul>
+
+{% if user.is_authenticated %}
+    <div class="mt-3">
+        <textarea id="comment-text" class="form-control" rows="3"
+                  placeholder="Ваш комментарий..."></textarea>
+        <button id="add-comment-btn" class="btn btn-success mt-2"
+                data-project-id="{{ project.pk }}">
+            Отправить комментарий
+        </button>
+    </div>
+{% endif %}
+
+{% if user.groups.first.name == 'Participant' and project.participant == user %}
+    <hr>
+    <a href="{% url 'project_edit' project.pk %}" class="btn btn-warning">Изменить</a>
+    <a href="{% url 'project_submit' project.pk %}" class="btn btn-success">Отправить на конкурс</a>
+    <a href="{% url 'project_delete' project.pk %}" class="btn btn-danger">Удалить</a>
+{% endif %}
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+$(document).ready(function () {
+
+    // ---------- Голосование ----------
+    $('#vote-btn').on('click', function () {
+        const btn = $(this);
+        const projectId = btn.data('project-id');
+
+        $.ajax({
+            url: '/projects/' + projectId + '/vote/',
+            type: 'POST',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+            success: function (response) {
+                if (response.success) {
+                    $('#votes-count').text(response.votes);
+                    btn.text('Голос учтён').prop('disabled', true);
+                } else {
+                    alert(response.message || 'Ошибка');
+                }
+            },
+            error: function () {
+                alert('Ошибка сети');
+            }
+        });
+    });
+
+    // ---------- Смена статуса ----------
+    $('#status-select').on('change', function () {
+        const select = $(this);
+        const projectId = select.data('project-id');
+        const newStatus = select.val();
+
+        $.ajax({
+            url: '/projects/' + projectId + '/change-status/',
+            type: 'POST',
+            data: { status: newStatus },
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+            success: function (response) {
+                if (response.success) {
+                    $('#status-display').text(response.status_display);
+                } else {
+                    alert('Ошибка: ' + response.message);
+                }
+            },
+            error: function (xhr) {
+                alert('Ошибка: ' + xhr.status);
+            }
+        });
+    });
+
+    // ---------- Добавление комментария ----------
+    $('#add-comment-btn').on('click', function () {
+        const btn = $(this);
+        const projectId = btn.data('project-id');
+        const text = $('#comment-text').val().trim();
+
+        if (!text) {
+            alert('Введите текст комментария');
+            return;
+        }
+
+        $.ajax({
+            url: '/projects/' + projectId + '/add-comment/',
+            type: 'POST',
+            data: { text: text },
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+            success: function (response) {
+                if (response.success) {
+                    $('#no-comments').remove();
+                    const c = response.comment;
+                    $('#comments-list').append(
+                        '<li><strong>' + c.author + ':</strong> ' +
+                        c.text + ' <small class="text-muted">' +
+                        c.created_at + '</small></li>'
+                    );
+                    $('#comment-text').val('');
+                } else {
+                    alert(response.message || 'Ошибка');
+                }
+            },
+            error: function () {
+                alert('Ошибка сети');
+            }
+        });
+    });
+
+});
+</script>
+{% endblock %}

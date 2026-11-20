@@ -1,0 +1,16 @@
+{% extends "admin/base.html" %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <style>
+        .main-footer,
+        footer,
+        div[class="main-footer"] {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+            padding: 0 !important;
+            opacity:  0 !important;
+        }
+    </style>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends 'contests/base.html' %}
+{% block title %}Проекты{% endblock %}
+{% block content %}
+<h2>Проекты</h2>
+<div class="row">
+    {% for project in projects %}
+    <div class="col-md-4 mb-3">
+        <div class="card"><div class="card-body">
+            <h5>{{ project.title }}</h5>
+            <p>{{ project.summary|truncatechars:80 }}</p>
+            <p><small>Статус: {{ project.get_status_display }}</small></p>
+            <a href="{% url 'project_detail' project.pk %}" class="btn btn-outline-primary btn-sm">Подробнее</a>
+        </div></div>
+    </div>
+    {% empty %}
+    <p>Проектов нет.</p>
+    {% endfor %}
+</div>
+{% endblock %}

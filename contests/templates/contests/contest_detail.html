@@ -1,0 +1,30 @@
+{% extends 'contests/base.html' %}
+{% block title %}{{ contest.name }}{% endblock %}
+{% block content %}
+<h1>{{ contest.name }}</h1>
+<p>{{ contest.description }}</p>
+<p><strong>Сроки:</strong> {{ contest.start_date }} — {{ contest.end_date }}</p>
+
+<h4>Этапы</h4>
+<ul>
+    {% for stage in stages %}
+        <li>{{ stage.order }}. {{ stage.name }} (до {{ stage.deadline }})</li>
+    {% empty %}
+        <li>Этапов нет.</li>
+    {% endfor %}
+</ul>
+
+<h4>Критерии оценки</h4>
+<ul>
+    {% for c in criteria %}
+        <li>{{ c.name }} — макс. {{ c.max_score }}</li>
+    {% empty %}
+        <li>Критериев нет.</li>
+    {% endfor %}
+</ul>
+
+{% if user.groups.first.name == 'Organizer' or user.is_superuser %}
+    <a href="{% url 'contest_edit' contest.pk %}" class="btn btn-warning">Изменить</a>
+    <a href="{% url 'contest_delete' contest.pk %}" class="btn btn-danger">Удалить</a>
+{% endif %}
+{% endblock %}
