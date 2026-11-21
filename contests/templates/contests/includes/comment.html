@@ -1,0 +1,16 @@
+{% load query_utils %}
+<div class="comment-item" id="comment-{{ c.id }}">
+    <span class="avatar-circle">{{ c.author.first_name|first|default:c.author.username|first|upper }}</span>
+    <div class="flex-grow-1" style="min-width:0">
+        <div class="comment-bubble">
+            <div class="d-flex justify-content-between"><span class="comment-author">{{ c.author.username }}</span><span class="comment-meta">{{ c.created_at|date:"d.m.Y H:i" }}</span></div>
+            <div style="font-size:.9rem">{{ c.text|mentionize|linebreaksbr }}</div>
+            {% if user.is_authenticated %}<button class="reply-btn mt-1" data-id="{{ c.id }}" data-author="{{ c.author.username }}"><i class="bi bi-reply"></i> Ответить</button>{% endif %}
+        </div>
+        {% if c.replies.all %}
+        <div class="comment-replies">
+            {% for reply in c.replies.all %}{% include 'contests/includes/comment.html' with c=reply %}{% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>

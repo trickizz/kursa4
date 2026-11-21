@@ -1,15 +1,17 @@
 {% extends 'contests/base.html' %}
+{% load query_utils %}
 {% block title %}{{ project.title }}{% endblock %}
 {% block content %}
 {% csrf_token %}
 <div class="row g-4">
     <div class="col-lg-8">
         <div class="card fade-up mb-4">
+            {% if project.cover %}<img src="{{ project.cover.url }}" class="cover-thumb" style="height:220px" alt="">{% endif %}
             <div class="card-body p-4">
                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
                     <span id="status-display" class="status-badge status-{{ project.status }}">{{ project.get_status_display }}</span>
                     <div class="d-flex gap-2">
-                        <span class="meta-chip"><i class="bi bi-star-fill text-warning"></i>Балл: <b id="avg-score">{{ project.average_score }}</b></span>
+                        <span class="meta-chip"><i class="bi bi-star-fill text-warning"></i>Балл: <b>{{ score_percent }}%</b></span>
                         <span class="meta-chip"><i class="bi bi-heart-fill text-danger"></i><b id="votes-count">{{ project.votes }}</b></span>
                     </div>
                 </div>
@@ -19,7 +21,9 @@
                     <a href="{% url 'contest_detail' project.contest.pk %}" class="meta-chip"><i class="bi bi-trophy"></i>{{ project.contest.name }}</a>
                     <span class="meta-chip"><i class="bi bi-person"></i>{{ project.participant.get_full_name|default:project.participant.username }}</span>
                     <span class="meta-chip"><i class="bi bi-mortarboard"></i>Наставник: {% if project.mentor %}{{ project.mentor.get_full_name|default:project.mentor.username }}{% else %}не назначен{% endif %}</span>
-                    <span class="meta-chip"><i class="bi bi-clock"></i>{{ project.created_at|date:"d.m.Y" }}</span>
+                    {% if team %}<span class="meta-chip"><i class="bi bi-people"></i>Команда:
+                        <span class="team-avatars ms-1">{% for m in team %}<span class="avatar-circle" title="{{ m.username }}">{{ m.first_name|first|default:m.username|first|upper }}</span>{% endfor %}</span>
+                    </span>{% endif %}
                 </div>
                 <div class="d-flex flex-wrap gap-2 mt-4">
                     {% if user.is_authenticated %}
@@ -44,20 +48,15 @@
                     <thead><tr><th>Критерий</th><th>Эксперт</th><th>Балл</th><th>Комментарий</th></tr></thead>
                     <tbody>
                     {% for e in evaluations %}
-                    <tr>
-                        <td class="fw-semibold">{{ e.criterion.name }}</td>
-                        <td>{{ e.expert.username }}</td>
+                    <tr><td class="fw-semibold">{{ e.criterion.name }}</td><td>{{ e.expert.username }}</td>
                         <td><span class="score-pill">{{ e.score }} / {{ e.criterion.max_score }}</span></td>
-                        <td class="text-muted" style="font-size:.85rem">{{ e.comment|default:"—" }}</td>
-                    </tr>
+                        <td class="text-muted" style="font-size:.85rem">{{ e.comment|default:"—" }}</td></tr>
                     {% endfor %}
                     </tbody>
                 </table></div>
                 {% else %}
-                <div class="empty-state" style="padding:2rem">
-                    <div class="es-icon" style="width:56px;height:56px;font-size:1.4rem"><i class="bi bi-star"></i></div>
-                    <p class="mb-0">Оценок пока нет.{% if can_evaluate %} Вы можете оценить проект первым!{% endif %}</p>
-                </div>
+                <div class="empty-state" style="padding:2rem"><div class="es-icon" style="width:56px;height:56px;font-size:1.4rem"><i class="bi bi-star"></i></div>
+                    <p class="mb-0">Оценок пока нет.{% if can_evaluate %} Вы можете оценить проект первым!{% endif %}</p></div>
                 {% endif %}
             </div>
         </div>
@@ -66,26 +65,17 @@
             <div class="card-header"><i class="bi bi-chat-dots text-primary me-2"></i>Комментарии</div>
             <div class="card-body">
                 <div id="comments-list">
-                    {% for c in comments %}
-                    <div class="comment-item">
-                        <span class="avatar-circle">{{ c.author.first_name|first|default:c.author.username|first|upper }}</span>
-                        <div class="comment-bubble">
-                            <div class="d-flex justify-content-between"><span class="comment-author">{{ c.author.username }}</span><span class="comment-meta">{{ c.created_at|date:"d.m.Y H:i" }}</span></div>
-                            <div style="font-size:.9rem">{{ c.text }}</div>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <p id="no-comments" class="text-muted mb-0" style="font-size:.9rem">Комментариев нет — начните обсуждение!</p>
-                    {% endfor %}
+                    {% for c in comments %}{% include 'contests/includes/comment.html' with c=c %}
+                    {% empty %}<p id="no-comments" class="text-muted mb-0" style="font-size:.9rem">Комментариев нет — начните обсуждение!</p>{% endfor %}
                 </div>
                 {% if user.is_authenticated %}
                 <div class="mt-3">
-                    <textarea id="comment-text" class="form-control" rows="3" placeholder="Ваш комментарий..."></textarea>
+                    <div id="reply-hint" class="form-text mb-1" style="display:none"></div>
+                    <input type="hidden" id="comment-parent-id" value="">
+                    <textarea id="comment-text" class="form-control" rows="3" placeholder="Ваш комментарий... Используйте @username для упоминания"></textarea>
                     <button id="add-comment-btn" class="btn btn-primary mt-2" data-project-id="{{ project.pk }}"><i class="bi bi-send me-1"></i>Отправить</button>
                 </div>
-                {% else %}
-                <p class="text-muted mt-3 mb-0" style="font-size:.88rem"><a href="{% url 'login' %}">Войдите</a>, чтобы оставить комментарий.</p>
-                {% endif %}
+                {% else %}<p class="text-muted mt-3 mb-0" style="font-size:.88rem"><a href="{% url 'login' %}">Войдите</a>, чтобы оставить комментарий.</p>{% endif %}
             </div>
         </div>
     </div>
@@ -100,12 +90,54 @@
                     {% for code, label in status_choices %}<option value="{{ code }}" {% if project.status == code %}selected{% endif %}>{{ label }}</option>{% endfor %}
                 </select>
                 <div class="form-text mb-3">Меняется мгновенно, без перезагрузки.</div>
-                <form method="post" action="{% url 'assign_mentor' project.pk %}">
+                <form method="post" action="{% url 'assign_mentor' project.pk %}" class="mb-3">
                     {% csrf_token %}
-                    <label class="form-label" for="{{ mentor_form.mentor.id_for_label }}">Наставник проекта</label>
+                    <label class="form-label">Наставник проекта</label>
                     {{ mentor_form.mentor }}
                     <button class="btn btn-soft btn-sm w-100 mt-2"><i class="bi bi-person-check me-1"></i>Назначить наставника</button>
                 </form>
+                <form method="post" action="{% url 'assign_expert' project.pk %}">
+                    {% csrf_token %}
+                    <label class="form-label">Назначить эксперта</label>
+                    {{ expert_form.expert }}
+                    <button class="btn btn-soft btn-sm w-100 mt-2"><i class="bi bi-clipboard-plus me-1"></i>Закрепить эксперта</button>
+                </form>
+                {% if expert_assignments %}
+                <div class="mt-3">
+                    <div class="form-label mb-2">Эксперты проекта</div>
+                    {% for a in expert_assignments %}
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="avatar-circle" style="width:28px;height:28px;font-size:.72rem">{{ a.expert.first_name|first|default:a.expert.username|first|upper }}</span>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between" style="font-size:.8rem"><b>{{ a.expert.username }}</b><span class="text-muted">{{ a.progress.done }}/{{ a.progress.total }}</span></div>
+                            <div class="expert-progress"><div style="width:{{ a.progress.percent }}%"></div></div>
+                        </div>
+                        <form method="post" action="{% url 'unassign_expert' a.pk %}">{% csrf_token %}<button class="btn btn-soft-danger btn-sm py-0"><i class="bi bi-x-lg"></i></button></form>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if is_owner %}
+        <div class="card fade-up mb-4">
+            <div class="card-header"><i class="bi bi-people text-primary me-2"></i>Команда проекта</div>
+            <div class="card-body">
+                <form method="post" action="{% url 'invite_team_member' project.pk %}" class="d-flex gap-2 mb-3">
+                    {% csrf_token %}
+                    {{ team_form.username }}
+                    <button class="btn btn-soft btn-sm"><i class="bi bi-person-plus"></i></button>
+                </form>
+                {% if team %}
+                    {% for m in team %}
+                    <div class="d-flex align-items-center gap-2 py-1">
+                        <span class="avatar-circle" style="width:28px;height:28px;font-size:.72rem">{{ m.first_name|first|default:m.username|first|upper }}</span>
+                        <span style="font-size:.88rem;font-weight:600">{{ m.get_full_name|default:m.username }}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}<p class="text-muted mb-0" style="font-size:.85rem">Пригласите соавторов по логину — они смогут загружать документы и следить за проектом.</p>{% endif %}
             </div>
         </div>
         {% endif %}
@@ -123,29 +155,27 @@
                         <a href="{{ doc.file.url }}" class="fw-bold d-block text-truncate" style="font-size:.88rem" download>{{ doc.description }}</a>
                         <span class="comment-meta">{{ doc.uploaded_at|date:"d.m.Y H:i" }}</span>
                     </div>
-                    {% if can_delete %}
-                    <form method="post" action="{% url 'document_delete' doc.pk %}" onsubmit="return confirm('Удалить документ?')">{% csrf_token %}
-                        <button class="btn btn-soft-danger btn-sm"><i class="bi bi-x-lg"></i></button>
-                    </form>
-                    {% endif %}
+                    {% if can_delete %}<form method="post" action="{% url 'document_delete' doc.pk %}" onsubmit="return confirm('Удалить документ?')">{% csrf_token %}<button class="btn btn-soft-danger btn-sm"><i class="bi bi-x-lg"></i></button></form>{% endif %}
                 </div>
-                {% empty %}
-                <p class="text-muted mb-0" style="font-size:.88rem">Документы не загружены.{% if can_upload %} Добавьте презентацию или пояснительную записку.{% endif %}</p>
-                {% endfor %}
+                {% empty %}<p class="text-muted mb-0" style="font-size:.88rem">Документы не загружены.{% if can_upload %} Добавьте презентацию или пояснительную записку.{% endif %}</p>{% endfor %}
             </div>
         </div>
 
-        <div class="card fade-up">
-            <div class="card-header"><i class="bi bi-info-circle text-primary me-2"></i>О проекте</div>
-            <div class="card-body" style="font-size:.88rem">
-                <div class="d-flex justify-content-between py-1"><span class="text-muted">Конкурс</span><a href="{% url 'contest_detail' project.contest.pk %}" class="fw-bold">{{ project.contest.name|truncatechars:24 }}</a></div>
-                <div class="d-flex justify-content-between py-1"><span class="text-muted">Участник</span><span class="fw-bold">{{ project.participant.username }}</span></div>
-                <div class="d-flex justify-content-between py-1"><span class="text-muted">Наставник</span><span class="fw-bold">{% if project.mentor %}{{ project.mentor.username }}{% else %}—{% endif %}</span></div>
-                <div class="d-flex justify-content-between py-1"><span class="text-muted">Оценок</span><span class="fw-bold">{{ evaluations|length }}</span></div>
-                <div class="d-flex justify-content-between py-1"><span class="text-muted">Создан</span><span class="fw-bold">{{ project.created_at|date:"d.m.Y" }}</span></div>
-                <div class="d-flex justify-content-between py-1"><span class="text-muted">Обновлён</span><span class="fw-bold">{{ project.updated_at|date:"d.m.Y" }}</span></div>
+        {% if status_history %}
+        <div class="card fade-up mb-4">
+            <div class="card-header"><i class="bi bi-clock-history text-primary me-2"></i>История статусов</div>
+            <div class="card-body">
+                <ul class="timeline">
+                    {% for h in status_history %}
+                    <li><span class="dot"><i class="bi bi-arrow-right" style="font-size:.6rem"></i></span>
+                        <div class="t-title" style="font-size:.85rem">{{ h.get_new_display }}</div>
+                        <div class="t-meta">{{ h.created_at|date:"d.m.Y H:i" }} · {% if h.changed_by %}{{ h.changed_by.username }}{% else %}система{% endif %}</div>
+                    </li>
+                    {% endfor %}
+                </ul>
             </div>
         </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
@@ -153,13 +183,9 @@
 {% block extra_js %}
 <script>
 $(function () {
-    // Голосование: 1 пользователь = 1 голос, повторный клик снимает голос
     $('#vote-btn').on('click', function () {
-        const btn = $(this);
-        btn.prop('disabled', true);
-        $.ajax({
-            url: '/projects/' + btn.data('project-id') + '/vote/',
-            type: 'POST',
+        const btn = $(this); btn.prop('disabled', true);
+        $.ajax({ url: '/projects/' + btn.data('project-id') + '/vote/', type: 'POST',
             headers: { 'X-CSRFToken': getCookie('csrftoken') },
             success: function (r) {
                 if (r.success) {
@@ -170,58 +196,59 @@ $(function () {
                 } else { alert(r.message || 'Ошибка'); }
             },
             error: function (xhr) { alert(xhr.responseJSON && xhr.responseJSON.message || 'Ошибка сети'); },
-            complete: function () { btn.prop('disabled', false); }
-        });
+            complete: function () { btn.prop('disabled', false); } });
     });
 
-    // Смена статуса организатором
     $('#status-select').on('change', function () {
         const select = $(this);
-        $.ajax({
-            url: '/projects/' + select.data('project-id') + '/change-status/',
-            type: 'POST',
-            data: { status: select.val() },
-            headers: { 'X-CSRFToken': getCookie('csrftoken') },
-            success: function (r) {
-                if (r.success) {
-                    $('#status-display').attr('class', 'status-badge status-' + r.status).text(r.status_display);
-                } else { alert('Ошибка: ' + r.message); }
-            },
-            error: function (xhr) { alert('Ошибка: ' + xhr.status); }
-        });
+        $.ajax({ url: '/projects/' + select.data('project-id') + '/change-status/', type: 'POST',
+            data: { status: select.val() }, headers: { 'X-CSRFToken': getCookie('csrftoken') },
+            success: function (r) { if (r.success) { $('#status-display').attr('class', 'status-badge status-' + r.status).text(r.status_display); } else { alert('Ошибка: ' + r.message); } },
+            error: function (xhr) { alert('Ошибка: ' + xhr.status); } });
     });
 
-    // Комментарии с экранированием HTML (защита от XSS)
     function esc(s) { return $('<div>').text(s).html(); }
+    function mentionize(s) { return esc(s).replace(/@([A-Za-z0-9_]{3,30})/g, '<span class="mention">@$1</span>'); }
+    function commentHtml(c) {
+        return '<div class="comment-item" id="comment-' + c.id + '">' +
+            '<span class="avatar-circle">' + esc(c.author.charAt(0).toUpperCase()) + '</span>' +
+            '<div class="flex-grow-1" style="min-width:0"><div class="comment-bubble">' +
+            '<div class="d-flex justify-content-between"><span class="comment-author">' + esc(c.author) + '</span>' +
+            '<span class="comment-meta">' + esc(c.created_at) + '</span></div>' +
+            '<div style="font-size:.9rem">' + mentionize(c.text) + '</div>' +
+            '<button class="reply-btn mt-1" data-id="' + c.id + '" data-author="' + esc(c.author) + '"><i class="bi bi-reply"></i> Ответить</button>' +
+            '</div><div class="comment-replies"></div></div></div>';
+    }
+    $(document).on('click', '.reply-btn', function () {
+        $('#comment-parent-id').val($(this).data('id'));
+        $('#reply-hint').show().html('Ответ пользователю <b>@' + esc($(this).data('author')) + '</b> · <a href="#" id="cancel-reply">отменить</a>');
+        $('#comment-text').focus();
+    });
+    $(document).on('click', '#cancel-reply', function (e) {
+        e.preventDefault(); $('#comment-parent-id').val(''); $('#reply-hint').hide();
+    });
     $('#add-comment-btn').on('click', function () {
-        const btn = $(this);
-        const text = $('#comment-text').val().trim();
+        const btn = $(this); const text = $('#comment-text').val().trim();
         if (!text) { alert('Введите текст комментария'); return; }
         btn.prop('disabled', true);
-        $.ajax({
-            url: '/projects/' + btn.data('project-id') + '/add-comment/',
-            type: 'POST',
-            data: { text: text },
+        $.ajax({ url: '/projects/' + btn.data('project-id') + '/add-comment/', type: 'POST',
+            data: { text: text, parent_id: $('#comment-parent-id').val() },
             headers: { 'X-CSRFToken': getCookie('csrftoken') },
             success: function (r) {
                 if (r.success) {
                     $('#no-comments').remove();
-                    const c = r.comment;
-                    $('#comments-list').append(
-                        '<div class="comment-item">' +
-                        '<span class="avatar-circle">' + esc(c.author.charAt(0).toUpperCase()) + '</span>' +
-                        '<div class="comment-bubble">' +
-                        '<div class="d-flex justify-content-between"><span class="comment-author">' + esc(c.author) + '</span>' +
-                        '<span class="comment-meta">' + esc(c.created_at) + '</span></div>' +
-                        '<div style="font-size:.9rem">' + esc(c.text) + '</div>' +
-                        '</div></div>'
-                    );
-                    $('#comment-text').val('');
+                    const html = commentHtml(r.comment);
+                    if (r.comment.parent_id) {
+                        let parent = $('#comment-' + r.comment.parent_id);
+                        let replies = parent.find('.comment-replies').first();
+                        if (!replies.length) { parent.find('.flex-grow-1').first().append('<div class="comment-replies"></div>'); replies = parent.find('.comment-replies').first(); }
+                        replies.append(html);
+                    } else { $('#comments-list').append(html); }
+                    $('#comment-text').val(''); $('#comment-parent-id').val(''); $('#reply-hint').hide();
                 } else { alert(r.message || 'Ошибка'); }
             },
             error: function () { alert('Ошибка сети'); },
-            complete: function () { btn.prop('disabled', false); }
-        });
+            complete: function () { btn.prop('disabled', false); } });
     });
 });
 </script>
