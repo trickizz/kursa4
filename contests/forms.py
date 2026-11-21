@@ -51,6 +51,14 @@ class CriterionForm(forms.ModelForm):
             'weight': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['weight'].required = False
+        self.fields['weight'].initial = 1
+
+    def clean_weight(self):
+        return self.cleaned_data.get('weight') or 1
+
 
 class ProjectForm(forms.ModelForm):
     tags = forms.CharField(label='Теги', required=False,
