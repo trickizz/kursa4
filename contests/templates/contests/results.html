@@ -9,14 +9,12 @@
                 {% else %}<span class="hero-chip"><i class="bi bi-hourglass-split"></i>Предварительный рейтинг</span>{% endif %}
             </div>
             <h1 class="h3 mb-1"><i class="bi bi-bar-chart-line me-2"></i>{{ contest.name }}</h1>
-            <p class="lead mb-0" style="font-size:.95rem">Рейтинг по честному баллу (% от максимума) и голосам</p>
+            <p class="lead mb-0" style="font-size:.95rem">Взвешенный балл (% от максимума с учётом весов критериев) и голоса</p>
         </div>
         <div class="d-flex flex-column gap-2">
-            {% if contest.results_finalized or can_manage %}
-            <a href="{% url 'contest_results_pdf' contest.pk %}" class="btn btn-light"><i class="bi bi-file-earmark-pdf me-1"></i>PDF-протокол</a>
-            {% endif %}
+            {% if contest.results_finalized or can_manage %}<a href="{% url 'contest_results_pdf' contest.pk %}" class="btn btn-light"><i class="bi bi-file-earmark-pdf me-1"></i>PDF-протокол</a>{% endif %}
             {% if can_finalize %}
-            <form method="post" action="{% url 'contest_finalize' contest.pk %}" onsubmit="return confirm('Подвести итоги? Конкурс будет закрыт, отобранные проекты завершены, победитель получит достижение.')">
+            <form method="post" action="{% url 'contest_finalize' contest.pk %}" onsubmit="return confirm('Подвести итоги? Конкурс закроется, голоса и оценки будут заморожены, результаты зафиксированы.')">
                 {% csrf_token %}<button class="btn btn-primary w-100"><i class="bi bi-flag me-1"></i>Подвести итоги</button>
             </form>
             {% endif %}
@@ -25,48 +23,63 @@
     </div>
 </section>
 
+{% if not contest.results_finalized %}
+<div class="card fade-up mb-4"><div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <b style="font-size:.9rem"><i class="bi bi-clipboard-check text-primary me-1"></i>Готовность экспертизы</b>
+        <span class="meta-chip">{{ progress.done }}/{{ progress.total }} проектов оценены полностью</span>
+    </div>
+    <div class="progress-gate"><div class="progress"><div class="progress-bar" style="width:{{ progress.percent }}%"></div></div><b>{{ progress.percent }}%</b></div>
+    {% if can_manage and not can_finalize %}<div class="form-text mt-2 text-warning"><i class="bi bi-exclamation-triangle me-1"></i>Итоги можно подвести, когда каждый проект оценён по всем критериям (и всеми закреплёнными экспертами).</div>{% endif %}
+</div></div>
+{% endif %}
+
+{% if contest.results_finalized and snapshot %}
+<div class="card fade-up"><div class="card-header grad"><i class="bi bi-lock-fill me-2"></i>Зафиксированные результаты</div>
+    <div class="card-body p-0"><div class="table-responsive"><table class="table table-clean">
+        <thead><tr><th style="width:60px">Место</th><th>Проект</th><th>Участник</th><th>Балл</th><th>Голоса</th><th>Статус</th></tr></thead>
+        <tbody>
+        {% for row in snapshot %}
+        <tr><td><span class="rank-badge {% if row.rank <= 3 %}rank-{{ row.rank }}{% endif %}">{{ row.rank }}</span></td>
+            <td><a href="/projects/{{ row.id }}/" class="fw-bold text-dark">{{ row.title }}</a></td>
+            <td>{{ row.participant }}</td><td><span class="score-pill">{{ row.score_percent }}%</span></td>
+            <td><span class="meta-chip"><i class="bi bi-heart-fill text-danger"></i>{{ row.votes }}</span></td>
+            <td>{{ row.status }}</td></tr>
+        {% endfor %}
+        </tbody>
+    </table></div></div>
+</div>
+{% else %}
 {% if top3 %}
 <div class="row g-3 mb-4">
     {% for p in top3 %}
-    <div class="col-md-4">
-        <div class="card card-hover fade-up h-100 text-center"><div class="card-body p-4">
-            <div class="medal mb-2">{% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% else %}🥉{% endif %}</div>
-            <span class="rank-badge rank-{{ forloop.counter }} mx-auto mb-2">{{ forloop.counter }}</span>
-            <h5 class="mt-2"><a href="{% url 'project_detail' p.pk %}" class="text-dark">{{ p.title }}</a></h5>
-            <p class="text-muted mb-2" style="font-size:.85rem">{{ p.participant.username }}</p>
-            <div class="d-flex justify-content-center gap-2">
-                <span class="score-pill"><i class="bi bi-star-fill text-warning me-1"></i>{{ p.score_percent }}%</span>
-                <span class="meta-chip"><i class="bi bi-heart-fill text-danger"></i>{{ p.votes }}</span>
-            </div>
-        </div></div>
-    </div>
+    <div class="col-md-4"><div class="card card-hover fade-up h-100 text-center"><div class="card-body p-4">
+        <div class="medal mb-2">{% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% else %}🥉{% endif %}</div>
+        <span class="rank-badge rank-{{ forloop.counter }} mx-auto mb-2">{{ forloop.counter }}</span>
+        <h5 class="mt-2"><a href="{% url 'project_detail' p.pk %}" class="text-dark">{{ p.title }}</a></h5>
+        <p class="text-muted mb-2" style="font-size:.85rem">{{ p.participant.username }}</p>
+        <div class="d-flex justify-content-center gap-2"><span class="score-pill"><i class="bi bi-star-fill text-warning me-1"></i>{{ p.weighted_score_percent }}%</span><span class="meta-chip"><i class="bi bi-heart-fill text-danger"></i>{{ p.votes }}</span></div>
+    </div></div></div>
     {% endfor %}
 </div>
 {% endif %}
-
-<div class="card fade-up">
-    <div class="card-header"><i class="bi bi-list-ol text-primary me-2"></i>Полный рейтинг <span class="meta-chip ms-2">{{ ranked|length }}</span></div>
+<div class="card fade-up"><div class="card-header"><i class="bi bi-list-ol text-primary me-2"></i>Полный рейтинг <span class="meta-chip ms-2">{{ ranked|length }}</span></div>
     <div class="card-body p-0">
         {% if ranked %}
         <div class="table-responsive"><table class="table table-clean">
             <thead><tr><th style="width:60px">Место</th><th>Проект</th><th>Участник</th><th>Балл</th><th>Голоса</th><th>Оценок</th><th>Статус</th></tr></thead>
             <tbody>
             {% for p in ranked %}
-            <tr>
-                <td><span class="rank-badge {% if forloop.counter <= 3 %}rank-{{ forloop.counter }}{% endif %}">{{ forloop.counter }}</span></td>
+            <tr><td><span class="rank-badge {% if forloop.counter <= 3 %}rank-{{ forloop.counter }}{% endif %}">{{ forloop.counter }}</span></td>
                 <td><a href="{% url 'project_detail' p.pk %}" class="fw-bold text-dark">{{ p.title }}</a></td>
-                <td>{{ p.participant.username }}</td>
-                <td><span class="score-pill">{{ p.score_percent }}%</span></td>
+                <td>{{ p.participant.username }}</td><td><span class="score-pill">{{ p.weighted_score_percent }}%</span></td>
                 <td><span class="meta-chip"><i class="bi bi-heart-fill text-danger"></i>{{ p.votes }}</span></td>
-                <td>{{ p.evaluations_count }}</td>
-                <td><span class="status-badge status-{{ p.status }}">{{ p.get_status_display }}</span></td>
-            </tr>
+                <td>{{ p.evaluations_count }}</td><td><span class="status-badge status-{{ p.status }}">{{ p.get_status_display }}</span></td></tr>
             {% endfor %}
             </tbody>
         </table></div>
-        {% else %}
-        <div class="empty-state"><div class="es-icon"><i class="bi bi-bar-chart"></i></div><h5>Пока нет проектов</h5><p>Рейтинг появится, когда участники подадут проекты.</p></div>
-        {% endif %}
+        {% else %}<div class="empty-state"><div class="es-icon"><i class="bi bi-bar-chart"></i></div><h5>Пока нет проектов</h5><p>Рейтинг появится, когда участники подадут проекты.</p></div>{% endif %}
     </div>
 </div>
+{% endif %}
 {% endblock %}

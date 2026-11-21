@@ -23,6 +23,18 @@
         </div>
         <div class="col-md-2 d-grid"><button class="btn btn-soft"><i class="bi bi-funnel me-1"></i>Фильтр</button></div>
     </div>
+    <div class="row g-2 mt-1 align-items-center">
+        <div class="col-md-3"><select name="sort" class="form-select" onchange="this.form.submit()">
+            <option value="new" {% if current_sort == 'new' %}selected{% endif %}>Сначала новые</option>
+            <option value="old" {% if current_sort == 'old' %}selected{% endif %}>Сначала старые</option>
+            <option value="votes" {% if current_sort == 'votes' %}selected{% endif %}>По голосам</option>
+            <option value="score" {% if current_sort == 'score' %}selected{% endif %}>По баллу</option>
+        </select></div>
+        <div class="col-md-9 d-flex flex-wrap gap-1">
+            <a href="{% url 'project_list' %}" class="tag-chip {% if not current_tag %}active{% endif %}">Все</a>
+            {% for t in tags %}<a href="?tag={{ t.name|urlencode }}" class="tag-chip {% if current_tag == t.name %}active{% endif %}"><i class="bi bi-tag"></i>{{ t.name }}</a>{% endfor %}
+        </div>
+    </div>
 </form>
 <div class="row g-4">
     {% for project in projects %}

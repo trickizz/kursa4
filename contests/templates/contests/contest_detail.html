@@ -11,6 +11,7 @@
                 {% else %}<span class="hero-chip"><i class="bi bi-lock"></i>Приём закрыт</span>{% endif %}
                 <span class="hero-chip"><i class="bi bi-calendar-event"></i>{{ contest.start_date|date:"d.m.Y" }} — {{ contest.end_date|date:"d.m.Y" }}</span>
                 {% if contest.is_open %}<span class="hero-chip"><i class="bi bi-hourglass-split"></i>осталось {{ contest.days_left }} дн.</span>{% endif %}
+                <span class="hero-chip"><i class="bi bi-clipboard-check"></i>оценено {{ contest.evaluation_progress.done }}/{{ contest.evaluation_progress.total }}</span>
             </div>
             <h1 class="h2 mb-2">{{ contest.name }}</h1>
             <p class="lead mb-0" style="font-size:1rem">{{ contest.description }}</p>
@@ -22,6 +23,7 @@
             {% if can_manage %}
                 <a href="{% url 'contest_edit' contest.pk %}" class="btn btn-soft"><i class="bi bi-pencil me-1"></i>Изменить</a>
                 <a href="{% url 'contest_delete' contest.pk %}" class="btn btn-soft-danger"><i class="bi bi-trash me-1"></i>Удалить</a>
+                <form method="post" action="{% url 'contest_clone' contest.pk %}">{% csrf_token %}<button class="btn btn-soft w-100"><i class="bi bi-copy me-1"></i>Дублировать</button></form>
             {% endif %}
         </div>
     </div>
@@ -81,6 +83,24 @@
         </div>
     </div>
     <div class="col-lg-7">
+        {% if can_manage and projects %}
+        <div class="card fade-up mb-4">
+            <div class="card-header"><i class="bi bi-ui-checks text-primary me-2"></i>Массовые действия</div>
+            <div class="card-body">
+                <form method="post" action="{% url 'bulk_action' contest.pk %}">{% csrf_token %}
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        {% for p in projects %}<label class="meta-chip" style="cursor:pointer"><input type="checkbox" name="project_ids" value="{{ p.pk }}" class="form-check-input me-1">{{ p.title|truncatechars:24 }}</label>{% endfor %}
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-3"><select name="action" class="form-select"><option value="status">Сменить статус</option><option value="expert">Назначить эксперта</option></select></div>
+                        <div class="col-md-3"><select name="status" class="form-select">{% for code, label in status_choices %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select></div>
+                        <div class="col-md-3"><select name="expert" class="form-select"><option value="">Эксперт…</option>{% for e in bulk_form.expert.field.queryset %}<option value="{{ e.pk }}">{{ e.username }}</option>{% endfor %}</select></div>
+                        <div class="col-md-3 d-grid"><button class="btn btn-primary"><i class="bi bi-lightning me-1"></i>Применить</button></div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
         <div class="card fade-up">
             <div class="card-header"><i class="bi bi-rocket text-primary me-2"></i>Проекты конкурса <span class="meta-chip ms-2">{{ projects|length }}</span></div>
             <div class="card-body p-0">
