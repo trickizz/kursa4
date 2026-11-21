@@ -8,7 +8,8 @@ from django.contrib.auth.models import User
 from PIL import Image, ImageDraw
 
 from contests.models import (Contest, Stage, Criterion, Project, Evaluation,
-                             Comment, ProjectVote, ExpertAssignment, TeamInvite)
+                             Comment, ProjectVote, ExpertAssignment, TeamInvite,
+                             Tag, Appeal, MentorTask)
 from contests.roles import (set_role, ROLE_PARTICIPANT, ROLE_MENTOR, ROLE_EXPERT,
                             ROLE_ORGANIZER)
 from contests.services import award, set_project_status, notify
@@ -128,6 +129,24 @@ class Command(BaseCommand):
                 ProjectVote.objects.create(project=p, user=users[v])
             p.votes = p.project_votes.count()
             p.save(update_fields=['votes'])
+
+        # теги, веса критериев, чек-лист наставника, апелляция (демо спринта 2)
+        for (cid, name), criterion in cr.items():
+            criterion.weight = 2 if ('Новизна' in name or 'Экологический' in name) else 1
+            criterion.save(update_fields=['weight'])
+        web, _ = Tag.objects.get_or_create(name='веб')
+        ai, _ = Tag.objects.get_or_create(name='ИИ')
+        eco, _ = Tag.objects.get_or_create(name='экология')
+        mobile, _ = Tag.objects.get_or_create(name='мобильное')
+        objs[0].tags.add(web, ai)
+        objs[1].tags.add(mobile, web)
+        objs[2].tags.add(eco)
+        MentorTask.objects.create(project=objs[0], mentor=users['mentor'], text='Добавить сравнение с аналогами')
+        MentorTask.objects.create(project=objs[0], mentor=users['mentor'], text='Подготовить презентацию', done=True)
+        ev = Evaluation.objects.filter(project=objs[0]).first()
+        if ev:
+            Appeal.objects.create(project=objs[0], evaluation=ev, author=users['student'],
+                                  reason='Просим пересмотреть оценку по новизне.', status='open')
 
         # достижения
         award(users['student'], 'debut')
