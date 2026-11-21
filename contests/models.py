@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.urls import reverse
+from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 
 class Contest(models.Model):
@@ -24,6 +26,27 @@ class Contest(models.Model):
 
     def get_absolute_url(self):
         return reverse('contest_detail', args=[self.pk])
+
+    @property
+    def is_open(self):
+        return self.is_active and not self.results_finalized and self.end_date >= timezone.localdate()
+
+    @property
+    def days_left(self):
+        return (self.end_date - timezone.localdate()).days
+
+
+def _limit_size(file, mb):
+    if file.size > mb * 1024 * 1024:
+        raise ValidationError(f'Файл слишком большой (максимум {mb} МБ).')
+
+
+def validate_cover_size(file):
+    _limit_size(file, 5)
+
+
+def validate_document_size(file):
+    _limit_size(file, 10)
 
 
 class Stage(models.Model):
@@ -73,6 +96,10 @@ class Project(models.Model):
         verbose_name = 'Проект'
         verbose_name_plural = 'Проекты'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['contest', 'status']),
+        ]
 
     def __str__(self):
         return self.title
@@ -88,6 +115,19 @@ class Project(models.Model):
 
     def evaluations_count(self):
         return self.evaluations.count()
+
+    def score_percent(self):
+        evaluations = self.evaluations.select_related('criterion')
+        if not evaluations:
+            return 0
+        total = sum(e.score / e.criterion.max_score * 100 for e in evaluations if e.criterion.max_score)
+        return round(total / len(evaluations), 1)
+
+    def all_members(self):
+        return [self.participant] + list(self.team.all())
+
+    def is_member(self, user):
+        return user.is_authenticated and (self.participant_id == user.pk or self.team.filter(pk=user.pk).exists())
 
     def is_editable_by_participant(self):
         """Участник может редактировать/подавать только черновик или отклонённый проект."""
@@ -174,3 +214,110 @@ class ProjectVote(models.Model):
 
     def __str__(self):
         return f'{self.user.username} → {self.project.title}'
+
+
+class Notification(models.Model):
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE,
+                                  related_name='notifications', verbose_name='Получатель')
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True,
+                              related_name='+', verbose_name='Инициатор')
+    text = models.CharField('Текст', max_length=300)
+    url = models.CharField('Ссылка', max_length=300, blank=True, default='')
+    is_read = models.BooleanField('Прочитано', default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Уведомление'
+        verbose_name_plural = 'Уведомления'
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['recipient', 'is_read'])]
+
+    def __str__(self):
+        return f'{self.recipient.username}: {self.text}'
+
+
+class StatusChange(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE,
+                                related_name='status_history', verbose_name='Проект')
+    old_status = models.CharField('Было', max_length=20, blank=True, default='')
+    new_status = models.CharField('Стало', max_length=20)
+    changed_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True,
+                                   related_name='+', verbose_name='Кто изменил')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Смена статуса'
+        verbose_name_plural = 'История статусов'
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['project'])]
+
+    def get_old_display(self):
+        return dict(Project.STATUS_CHOICES).get(self.old_status, '—')
+
+    def get_new_display(self):
+        return dict(Project.STATUS_CHOICES).get(self.new_status, self.new_status)
+
+
+class ExpertAssignment(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE,
+                                related_name='expert_assignments', verbose_name='Проект')
+    expert = models.ForeignKey(User, on_delete=models.CASCADE,
+                               related_name='expert_assignments', verbose_name='Эксперт')
+    assigned_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True,
+                                    related_name='+', verbose_name='Назначил')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Назначение эксперта'
+        verbose_name_plural = 'Назначения экспертов'
+        unique_together = ['project', 'expert']
+
+    def progress(self):
+        total = self.project.contest.criteria.count()
+        done = Evaluation.objects.filter(project=self.project, expert=self.expert).count()
+        return {'done': done, 'total': total,
+                'percent': round(done / total * 100) if total else 0}
+
+
+class TeamInvite(models.Model):
+    STATUS_CHOICES = [('pending', 'Ожидает'), ('accepted', 'Принято'), ('declined', 'Отклонено')]
+    project = models.ForeignKey(Project, on_delete=models.CASCADE,
+                                related_name='team_invites', verbose_name='Проект')
+    user = models.ForeignKey(User, on_delete=models.CASCADE,
+                             related_name='team_invites', verbose_name='Приглашённый')
+    invited_by = models.ForeignKey(User, on_delete=models.CASCADE,
+                                   related_name='+', verbose_name='Пригласил')
+    status = models.CharField('Статус', max_length=10, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Приглашение в команду'
+        verbose_name_plural = 'Приглашения в команду'
+        unique_together = ['project', 'user']
+
+
+class Achievement(models.Model):
+    code = models.SlugField('Код', unique=True)
+    title = models.CharField('Название', max_length=100)
+    description = models.CharField('Описание', max_length=200)
+    icon = models.CharField('Иконка', max_length=40, default='bi-star')
+
+    class Meta:
+        verbose_name = 'Достижение'
+        verbose_name_plural = 'Достижения'
+
+    def __str__(self):
+        return self.title
+
+
+class UserAchievement(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE,
+                             related_name='achievements', verbose_name='Пользователь')
+    achievement = models.ForeignKey(Achievement, on_delete=models.CASCADE,
+                                    related_name='earned', verbose_name='Достижение')
+    earned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Достижение пользователя'
+        verbose_name_plural = 'Достижения пользователей'
+        unique_together = ['user', 'achievement']
