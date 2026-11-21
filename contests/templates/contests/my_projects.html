@@ -2,24 +2,40 @@
 {% block title %}Мои проекты{% endblock %}
 {% block content %}
 <div class="page-head">
-    <div><h1><i class="bi bi-folder2 text-primary me-2"></i>Мои проекты</h1><p class="page-sub">Черновики и поданные работы</p></div>
+    <div><h1><i class="bi bi-folder2 text-primary me-2"></i>Мои проекты</h1><p class="page-sub">Ваши проекты и проекты, где вы соавтор</p></div>
     <a href="{% url 'project_create' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Создать проект</a>
 </div>
+{% if invites %}
+<div class="card fade-up mb-4">
+    <div class="card-header grad"><i class="bi bi-people me-2"></i>Приглашения в команду</div>
+    <div class="card-body">
+        {% for inv in invites %}
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 py-2 {% if not forloop.last %}border-bottom{% endif %}">
+            <div style="font-size:.9rem"><b>{{ inv.invited_by.username }}</b> приглашает вас в команду проекта <a href="{% url 'project_detail' inv.project.pk %}" class="fw-bold">«{{ inv.project.title }}»</a></div>
+            <div class="d-flex gap-2">
+                <form method="post" action="{% url 'respond_team_invite' inv.pk %}">{% csrf_token %}<input type="hidden" name="action" value="accept"><button class="btn btn-soft-success btn-sm"><i class="bi bi-check-lg me-1"></i>Принять</button></form>
+                <form method="post" action="{% url 'respond_team_invite' inv.pk %}">{% csrf_token %}<input type="hidden" name="action" value="decline"><button class="btn btn-soft-danger btn-sm"><i class="bi bi-x-lg"></i></button></form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
 {% if projects %}
 <div class="card fade-up"><div class="card-body p-0"><div class="table-responsive">
     <table class="table table-clean">
-        <thead><tr><th>Проект</th><th>Конкурс</th><th>Статус</th><th>Наставник</th><th class="text-end">Балл / Голоса</th><th></th></tr></thead>
+        <thead><tr><th>Проект</th><th>Конкурс</th><th>Статус</th><th>Роль</th><th class="text-end">Балл / Голоса</th><th></th></tr></thead>
         <tbody>
         {% for p in projects %}
         <tr>
             <td><a href="{% url 'project_detail' p.pk %}" class="fw-bold text-dark">{{ p.title }}</a></td>
             <td style="font-size:.85rem">{{ p.contest.name|truncatechars:28 }}</td>
             <td><span class="status-badge status-{{ p.status }}">{{ p.get_status_display }}</span></td>
-            <td style="font-size:.85rem">{{ p.mentor.username|default:"—" }}</td>
-            <td class="text-end"><span class="score-pill me-1"><i class="bi bi-star-fill text-warning me-1"></i>{{ p.average_score }}</span><span class="meta-chip"><i class="bi bi-heart-fill text-danger"></i>{{ p.votes }}</span></td>
+            <td>{% if p.participant_id == user.pk %}<span class="role-badge role-participant">Автор</span>{% else %}<span class="role-badge role-mentor">Соавтор</span>{% endif %}</td>
+            <td class="text-end"><span class="score-pill me-1"><i class="bi bi-star-fill text-warning me-1"></i>{{ p.score_percent }}%</span><span class="meta-chip"><i class="bi bi-heart-fill text-danger"></i>{{ p.votes }}</span></td>
             <td class="text-end">
-                {% if p.status == 'draft' or p.status == 'rejected' %}
-                    <a href="{% url 'project_submit' p.pk %}" class="btn btn-soft-success btn-sm" title="Отправить на конкурс"><i class="bi bi-send"></i></a>
+                {% if p.participant_id == user.pk and p.status == 'draft' or p.participant_id == user.pk and p.status == 'rejected' %}
+                    <a href="{% url 'project_submit' p.pk %}" class="btn btn-soft-success btn-sm" title="Отправить"><i class="bi bi-send"></i></a>
                     <a href="{% url 'project_edit' p.pk %}" class="btn btn-soft btn-sm" title="Редактировать"><i class="bi bi-pencil"></i></a>
                 {% endif %}
             </td>
@@ -31,8 +47,7 @@
 {% else %}
 <div class="card"><div class="empty-state">
     <div class="es-icon"><i class="bi bi-folder2-open"></i></div>
-    <h5>У вас пока нет проектов</h5>
-    <p>Создайте первый проект и подайте его на конкурс!</p>
+    <h5>У вас пока нет проектов</h5><p>Создайте первый проект и подайте его на конкурс!</p>
     <a href="{% url 'project_create' %}" class="btn btn-primary"><i class="bi bi-rocket-takeoff me-1"></i>Создать проект</a>
 </div></div>
 {% endif %}
