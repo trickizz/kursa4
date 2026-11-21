@@ -11,3 +11,5 @@ htmlcov/
 .ruff_cache/
 *.whl
 .pytest_cache/
+coverage.json
+backups/
