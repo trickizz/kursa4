@@ -122,7 +122,9 @@ class FeatureTests(TestCase):
         p2 = Project.objects.create(title='P2', summary='s', contest=self.contest,
                                     participant=self.stud2, status='selected')
         Evaluation.objects.create(project=self.proj, expert=self.exp, criterion=self.cr1, score=9)
+        Evaluation.objects.create(project=self.proj, expert=self.exp, criterion=self.cr2, score=4)
         Evaluation.objects.create(project=p2, expert=self.exp, criterion=self.cr1, score=3)
+        Evaluation.objects.create(project=p2, expert=self.exp, criterion=self.cr2, score=2)
         self.login(self.org)
         r = self.client.get(reverse('contest_results', args=[self.contest.pk]))
         self.assertEqual(r.context['ranked'][0].title, 'P1')
