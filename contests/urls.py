@@ -14,6 +14,7 @@ router.register('evaluations', api.EvaluationViewSet)
 
 urlpatterns = [
     path('', views.HomeView.as_view(), name='home'),
+    path('healthz/', views.healthz, name='healthz'),
     path('register/', views.RegisterView.as_view(), name='register'),
     path('profile/', views.ProfileView.as_view(), name='profile'),
     path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
@@ -63,6 +64,18 @@ urlpatterns = [
     path('export/projects/', views.export_projects_view, name='export_projects'),
     path('export/evaluations/', views.export_evaluations_view, name='export_evaluations'),
     path('import/projects/', import_projects_csv, name='import_projects'),
+    path('export/xlsx/', views.export_xlsx, name='export_xlsx'),
+
+    path('comments/<int:pk>/edit/', views.comment_edit, name='comment_edit'),
+    path('comments/<int:pk>/delete/', views.comment_delete, name='comment_delete'),
+    path('projects/<int:pk>/appeal/', views.appeal_create, name='appeal_create'),
+    path('appeals/<int:pk>/resolve/', views.appeal_resolve, name='appeal_resolve'),
+    path('contests/<int:pk>/clone/', views.contest_clone, name='contest_clone'),
+    path('contests/<int:pk>/bulk/', views.bulk_action, name='bulk_action'),
+    path('projects/<int:pk>/mentor-task/add/', views.mentor_task_add, name='mentor_task_add'),
+    path('mentor-tasks/<int:pk>/toggle/', views.mentor_task_toggle, name='mentor_task_toggle'),
+    path('mentor-tasks/<int:pk>/delete/', views.mentor_task_delete, name='mentor_task_delete'),
+    path('notifications/stream/', views.notifications_stream, name='notifications_stream'),
 
     path('api/', include(router.urls)),
     path('api/me/', api.MeView.as_view(), name='api_me'),

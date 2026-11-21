@@ -47,6 +47,7 @@ class ContestViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ContestSerializer
     search_fields = ['name', 'description']
     ordering_fields = ['created_at', 'end_date']
+    filterset_fields = ['is_active', 'results_finalized']
 
     @action(detail=True)
     def results(self, request, pk=None):
@@ -64,6 +65,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectSerializer
     search_fields = ['title', 'summary']
     ordering_fields = ['created_at', 'votes']
+    filterset_fields = ['contest', 'status']
     http_method_names = ['get', 'post', 'head', 'options']
 
     def get_permissions(self):
@@ -93,6 +95,7 @@ class EvaluationViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Evaluation.objects.select_related('project', 'expert', 'criterion')
     serializer_class = EvaluationSerializer
     ordering_fields = ['created_at', 'score']
+    filterset_fields = ['project', 'expert', 'criterion']
 
 
 class MeSerializer(serializers.Serializer):
