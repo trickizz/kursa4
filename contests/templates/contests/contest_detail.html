@@ -1,21 +1,26 @@
 {% extends 'contests/base.html' %}
 {% block title %}{{ contest.name }}{% endblock %}
 {% block content %}
+{% if contest.cover %}<img src="{{ contest.cover.url }}" class="cover-hero fade-up" alt="{{ contest.name }}">{% endif %}
 <section class="hero fade-up" style="padding:2.4rem 2.2rem">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
         <div style="max-width:640px">
-            <div class="d-flex gap-2 mb-3">
-                {% if contest.is_active %}<span class="hero-chip"><i class="bi bi-broadcast"></i>Приём открыт</span>{% else %}<span class="hero-chip"><i class="bi bi-lock"></i>Завершён</span>{% endif %}
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                {% if contest.results_finalized %}<span class="hero-chip"><i class="bi bi-flag-fill"></i>Итоги подведены</span>
+                {% elif contest.is_open %}<span class="hero-chip"><i class="bi bi-broadcast"></i>Приём открыт</span>
+                {% else %}<span class="hero-chip"><i class="bi bi-lock"></i>Приём закрыт</span>{% endif %}
                 <span class="hero-chip"><i class="bi bi-calendar-event"></i>{{ contest.start_date|date:"d.m.Y" }} — {{ contest.end_date|date:"d.m.Y" }}</span>
+                {% if contest.is_open %}<span class="hero-chip"><i class="bi bi-hourglass-split"></i>осталось {{ contest.days_left }} дн.</span>{% endif %}
             </div>
             <h1 class="h2 mb-2">{{ contest.name }}</h1>
             <p class="lead mb-0" style="font-size:1rem">{{ contest.description }}</p>
             <p class="mt-3 mb-0" style="font-size:.85rem;color:#a5b4fc"><i class="bi bi-person-badge me-1"></i>Организатор: {{ contest.organizer.get_full_name|default:contest.organizer.username }}</p>
         </div>
         <div class="d-flex flex-column gap-2">
-            {% if is_participant and contest.is_active %}<a href="{% url 'project_create' %}" class="btn btn-light"><i class="bi bi-rocket-takeoff me-1"></i>Подать проект</a>{% endif %}
+            <a href="{% url 'contest_results' contest.pk %}" class="btn btn-light"><i class="bi bi-bar-chart-line me-1"></i>Результаты</a>
+            {% if is_participant and contest.is_open %}<a href="{% url 'project_create' %}" class="btn btn-primary"><i class="bi bi-rocket-takeoff me-1"></i>Подать проект</a>{% endif %}
             {% if can_manage %}
-                <a href="{% url 'contest_edit' contest.pk %}" class="btn btn-primary"><i class="bi bi-pencil me-1"></i>Изменить</a>
+                <a href="{% url 'contest_edit' contest.pk %}" class="btn btn-soft"><i class="bi bi-pencil me-1"></i>Изменить</a>
                 <a href="{% url 'contest_delete' contest.pk %}" class="btn btn-soft-danger"><i class="bi bi-trash me-1"></i>Удалить</a>
             {% endif %}
         </div>
@@ -32,11 +37,11 @@
                 {% if stages %}
                 <ul class="timeline">
                     {% for stage in stages %}
-                    <li><span class="dot">{{ stage.order }}</span>
+                    <li {% if stage.deadline < today %}class="stage-overdue"{% endif %}><span class="dot">{{ stage.order }}</span>
                         <div class="d-flex justify-content-between align-items-start gap-2">
                             <div>
                                 <div class="t-title">{{ stage.name }}</div>
-                                <div class="t-meta"><i class="bi bi-clock me-1"></i>до {{ stage.deadline|date:"d.m.Y" }}</div>
+                                <div class="t-meta"><i class="bi bi-clock me-1"></i>до {{ stage.deadline|date:"d.m.Y" }}{% if stage.deadline < today %} · просрочен{% endif %}</div>
                                 {% if stage.description %}<div class="text-muted mt-1" style="font-size:.83rem">{{ stage.description }}</div>{% endif %}
                             </div>
                             {% if can_manage %}
@@ -88,7 +93,7 @@
                         <td><a href="{% url 'project_detail' p.pk %}" class="fw-bold text-dark">{{ p.title }}</a></td>
                         <td>{{ p.participant.username }}</td>
                         <td><span class="status-badge status-{{ p.status }}">{{ p.get_status_display }}</span></td>
-                        <td class="text-end"><span class="score-pill me-1"><i class="bi bi-star-fill text-warning me-1"></i>{{ p.average_score }}</span> <span class="meta-chip"><i class="bi bi-heart-fill text-danger"></i>{{ p.votes }}</span></td>
+                        <td class="text-end"><span class="score-pill me-1"><i class="bi bi-star-fill text-warning me-1"></i>{{ p.score_percent }}%</span> <span class="meta-chip"><i class="bi bi-heart-fill text-danger"></i>{{ p.votes }}</span></td>
                     </tr>
                     {% endfor %}
                     </tbody>
@@ -97,7 +102,7 @@
                 <div class="empty-state">
                     <div class="es-icon"><i class="bi bi-rocket"></i></div>
                     <h5>Проектов пока нет</h5><p>Станьте первым участником этого конкурса!</p>
-                    {% if is_participant and contest.is_active %}<a href="{% url 'project_create' %}" class="btn btn-primary"><i class="bi bi-rocket-takeoff me-1"></i>Подать проект</a>{% endif %}
+                    {% if is_participant and contest.is_open %}<a href="{% url 'project_create' %}" class="btn btn-primary"><i class="bi bi-rocket-takeoff me-1"></i>Подать проект</a>{% endif %}
                 </div>
                 {% endif %}
             </div>
