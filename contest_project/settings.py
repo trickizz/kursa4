@@ -29,10 +29,14 @@ INSTALLED_APPS = [
     'contests',
 ]
 
-# Тема админ-панели Jazzmin подключается, если пакет установлен (см. requirements.txt)
+# Тема админ-панели Jazzmin подключается, если пакет установлен (см. requirements.txt).
+# В режиме тестов отключается (несовместимость jazzmin с coverage-трассировкой).
+import sys as _sys
+_TESTING = 'test' in _sys.argv
 try:
-    import jazzmin  # noqa: F401
-    INSTALLED_APPS.insert(0, 'jazzmin')
+    if not _TESTING:
+        import jazzmin  # noqa: F401
+        INSTALLED_APPS.insert(0, 'jazzmin')
 except ImportError:
     pass
 
