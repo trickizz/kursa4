@@ -6,24 +6,23 @@
 <div class="row g-4">
     <div class="col-lg-8">
         <div class="card fade-up mb-4">
-            {% if project.cover %}<img src="{{ project.cover.url }}" class="cover-thumb" style="height:220px" alt="">{% endif %}
+            {% if project.cover %}<img src="{{ project.cover_thumb.url|default:project.cover.url }}" class="cover-thumb" style="height:220px" alt="">{% endif %}
             <div class="card-body p-4">
                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
                     <span id="status-display" class="status-badge status-{{ project.status }}">{{ project.get_status_display }}</span>
                     <div class="d-flex gap-2">
-                        <span class="meta-chip"><i class="bi bi-star-fill text-warning"></i>Балл: <b>{{ score_percent }}%</b></span>
+                        <span class="meta-chip"><i class="bi bi-star-fill text-warning"></i>Балл: <b>{{ weighted_score }}%</b></span>
                         <span class="meta-chip"><i class="bi bi-heart-fill text-danger"></i><b id="votes-count">{{ project.votes }}</b></span>
                     </div>
                 </div>
                 <h1 class="h2">{{ project.title }}</h1>
                 <p style="font-size:.97rem">{{ project.summary|linebreaksbr }}</p>
-                <div class="d-flex flex-wrap gap-2 mt-3">
+                {% if tags %}<div class="d-flex flex-wrap gap-1 mb-2">{% for t in tags %}<a href="{% url 'project_list' %}?tag={{ t.name|urlencode }}" class="tag-chip"><i class="bi bi-tag"></i>{{ t.name }}</a>{% endfor %}</div>{% endif %}
+                <div class="d-flex flex-wrap gap-2 mt-2">
                     <a href="{% url 'contest_detail' project.contest.pk %}" class="meta-chip"><i class="bi bi-trophy"></i>{{ project.contest.name }}</a>
                     <span class="meta-chip"><i class="bi bi-person"></i>{{ project.participant.get_full_name|default:project.participant.username }}</span>
                     <span class="meta-chip"><i class="bi bi-mortarboard"></i>Наставник: {% if project.mentor %}{{ project.mentor.get_full_name|default:project.mentor.username }}{% else %}не назначен{% endif %}</span>
-                    {% if team %}<span class="meta-chip"><i class="bi bi-people"></i>Команда:
-                        <span class="team-avatars ms-1">{% for m in team %}<span class="avatar-circle" title="{{ m.username }}">{{ m.first_name|first|default:m.username|first|upper }}</span>{% endfor %}</span>
-                    </span>{% endif %}
+                    {% if team %}<span class="meta-chip"><i class="bi bi-people"></i>Команда:<span class="team-avatars ms-1">{% for m in team %}<span class="avatar-circle" title="{{ m.username }}">{{ m.first_name|first|default:m.username|first|upper }}</span>{% endfor %}</span></span>{% endif %}
                 </div>
                 <div class="d-flex flex-wrap gap-2 mt-4">
                     {% if user.is_authenticated %}
@@ -48,7 +47,7 @@
                     <thead><tr><th>Критерий</th><th>Эксперт</th><th>Балл</th><th>Комментарий</th></tr></thead>
                     <tbody>
                     {% for e in evaluations %}
-                    <tr><td class="fw-semibold">{{ e.criterion.name }}</td><td>{{ e.expert.username }}</td>
+                    <tr><td class="fw-semibold">{{ e.criterion.name }} <span class="text-muted" style="font-size:.72rem">вес {{ e.criterion.weight }}</span></td><td>{{ e.expert.username }}</td>
                         <td><span class="score-pill">{{ e.score }} / {{ e.criterion.max_score }}</span></td>
                         <td class="text-muted" style="font-size:.85rem">{{ e.comment|default:"—" }}</td></tr>
                     {% endfor %}
@@ -58,6 +57,68 @@
                 <div class="empty-state" style="padding:2rem"><div class="es-icon" style="width:56px;height:56px;font-size:1.4rem"><i class="bi bi-star"></i></div>
                     <p class="mb-0">Оценок пока нет.{% if can_evaluate %} Вы можете оценить проект первым!{% endif %}</p></div>
                 {% endif %}
+            </div>
+        </div>
+
+        {% if mentor_tasks or is_project_mentor %}
+        <div class="card fade-up mb-4">
+            <div class="card-header"><i class="bi bi-list-check text-primary me-2"></i>Чек-лист наставника</div>
+            <div class="card-body">
+                <div id="checklist">
+                    {% for task in mentor_tasks %}
+                    <div class="checklist-item {% if task.done %}done{% endif %}" id="task-{{ task.id }}">
+                        <button class="checklist-toggle task-toggle" data-id="{{ task.id }}">{% if task.done %}<i class="bi bi-check-lg"></i>{% endif %}</button>
+                        <span class="checklist-text">{{ task.text }}</span>
+                        {% if is_project_mentor %}
+                        <form method="post" action="{% url 'mentor_task_delete' task.id %}">{% csrf_token %}<button class="btn btn-soft-danger btn-sm py-0"><i class="bi bi-x-lg"></i></button></form>
+                        {% endif %}
+                    </div>
+                    {% empty %}<p class="text-muted" style="font-size:.88rem">Задач пока нет.</p>{% endfor %}
+                </div>
+                {% if is_project_mentor %}
+                <form method="post" action="{% url 'mentor_task_add' project.pk %}" class="d-flex gap-2 mt-2">
+                    {% csrf_token %}{{ mentor_task_form.text }}<button class="btn btn-soft btn-sm"><i class="bi bi-plus-lg"></i></button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card fade-up mb-4">
+            <div class="card-header"><i class="bi bi-flag text-primary me-2"></i>Апелляции</div>
+            <div class="card-body">
+                {% if is_member and evaluations and not contest_locked %}
+                <form method="post" action="{% url 'appeal_create' project.pk %}" class="mb-3">
+                    {% csrf_token %}
+                    <div class="row g-2">
+                        <div class="col-md-5"><select name="evaluation" class="form-select" required>
+                            <option value="">Оценка для оспаривания…</option>
+                            {% for e in evaluations %}<option value="{{ e.pk }}">{{ e.criterion.name }} — {{ e.expert.username }} ({{ e.score }})</option>{% endfor %}
+                        </select></div>
+                        <div class="col-md-5"><input type="text" name="reason" class="form-control" placeholder="Причина апелляции" required></div>
+                        <div class="col-md-2 d-grid"><button class="btn btn-soft"><i class="bi bi-flag me-1"></i>Подать</button></div>
+                    </div>
+                </form>
+                {% endif %}
+                {% for a in appeals %}
+                <div class="appeal-card">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div style="font-size:.88rem"><b>{{ a.evaluation.criterion.name }}</b> · {{ a.author.username }}
+                            <div class="text-muted mt-1">{{ a.reason }}</div>
+                            {% if a.resolution %}<div class="mt-1"><i class="bi bi-chat-left-text me-1"></i>{{ a.resolution }}</div>{% endif %}
+                        </div>
+                        <span class="appeal-badge appeal-{{ a.status }}">{{ a.get_status_display }}</span>
+                    </div>
+                    {% if can_manage and a.status == 'open' %}
+                    <form method="post" action="{% url 'appeal_resolve' a.pk %}" class="row g-2 mt-2">
+                        {% csrf_token %}
+                        <div class="col-md-4"><select name="status" class="form-select form-select-sm"><option value="accepted">Удовлетворить</option><option value="rejected">Отклонить</option></select></div>
+                        <div class="col-md-6"><input type="text" name="resolution" class="form-control form-control-sm" placeholder="Комментарий решения"></div>
+                        <div class="col-md-2 d-grid"><button class="btn btn-soft btn-sm">OK</button></div>
+                    </form>
+                    {% endif %}
+                </div>
+                {% empty %}<p class="text-muted mb-0" style="font-size:.88rem">Апелляций нет.{% if is_member %} Вы можете оспорить оценку выше.{% endif %}</p>{% endfor %}
             </div>
         </div>
 
@@ -90,28 +151,21 @@
                     {% for code, label in status_choices %}<option value="{{ code }}" {% if project.status == code %}selected{% endif %}>{{ label }}</option>{% endfor %}
                 </select>
                 <div class="form-text mb-3">Меняется мгновенно, без перезагрузки.</div>
-                <form method="post" action="{% url 'assign_mentor' project.pk %}" class="mb-3">
-                    {% csrf_token %}
-                    <label class="form-label">Наставник проекта</label>
-                    {{ mentor_form.mentor }}
+                <form method="post" action="{% url 'assign_mentor' project.pk %}" class="mb-3">{% csrf_token %}
+                    <label class="form-label">Наставник проекта</label>{{ mentor_form.mentor }}
                     <button class="btn btn-soft btn-sm w-100 mt-2"><i class="bi bi-person-check me-1"></i>Назначить наставника</button>
                 </form>
-                <form method="post" action="{% url 'assign_expert' project.pk %}">
-                    {% csrf_token %}
-                    <label class="form-label">Назначить эксперта</label>
-                    {{ expert_form.expert }}
+                <form method="post" action="{% url 'assign_expert' project.pk %}">{% csrf_token %}
+                    <label class="form-label">Назначить эксперта</label>{{ expert_form.expert }}
                     <button class="btn btn-soft btn-sm w-100 mt-2"><i class="bi bi-clipboard-plus me-1"></i>Закрепить эксперта</button>
                 </form>
                 {% if expert_assignments %}
-                <div class="mt-3">
-                    <div class="form-label mb-2">Эксперты проекта</div>
+                <div class="mt-3"><div class="form-label mb-2">Эксперты проекта</div>
                     {% for a in expert_assignments %}
                     <div class="d-flex align-items-center gap-2 mb-2">
                         <span class="avatar-circle" style="width:28px;height:28px;font-size:.72rem">{{ a.expert.first_name|first|default:a.expert.username|first|upper }}</span>
-                        <div class="flex-grow-1">
-                            <div class="d-flex justify-content-between" style="font-size:.8rem"><b>{{ a.expert.username }}</b><span class="text-muted">{{ a.progress.done }}/{{ a.progress.total }}</span></div>
-                            <div class="expert-progress"><div style="width:{{ a.progress.percent }}%"></div></div>
-                        </div>
+                        <div class="flex-grow-1"><div class="d-flex justify-content-between" style="font-size:.8rem"><b>{{ a.expert.username }}</b><span class="text-muted">{{ a.progress.done }}/{{ a.progress.total }}</span></div>
+                            <div class="expert-progress"><div style="width:{{ a.progress.percent }}%"></div></div></div>
                         <form method="post" action="{% url 'unassign_expert' a.pk %}">{% csrf_token %}<button class="btn btn-soft-danger btn-sm py-0"><i class="bi bi-x-lg"></i></button></form>
                     </div>
                     {% endfor %}
@@ -125,26 +179,15 @@
         <div class="card fade-up mb-4">
             <div class="card-header"><i class="bi bi-people text-primary me-2"></i>Команда проекта</div>
             <div class="card-body">
-                <form method="post" action="{% url 'invite_team_member' project.pk %}" class="d-flex gap-2 mb-3">
-                    {% csrf_token %}
-                    {{ team_form.username }}
-                    <button class="btn btn-soft btn-sm"><i class="bi bi-person-plus"></i></button>
-                </form>
-                {% if team %}
-                    {% for m in team %}
-                    <div class="d-flex align-items-center gap-2 py-1">
-                        <span class="avatar-circle" style="width:28px;height:28px;font-size:.72rem">{{ m.first_name|first|default:m.username|first|upper }}</span>
-                        <span style="font-size:.88rem;font-weight:600">{{ m.get_full_name|default:m.username }}</span>
-                    </div>
-                    {% endfor %}
-                {% else %}<p class="text-muted mb-0" style="font-size:.85rem">Пригласите соавторов по логину — они смогут загружать документы и следить за проектом.</p>{% endif %}
+                <form method="post" action="{% url 'invite_team_member' project.pk %}" class="d-flex gap-2 mb-3">{% csrf_token %}{{ team_form.username }}<button class="btn btn-soft btn-sm"><i class="bi bi-person-plus"></i></button></form>
+                {% if team %}{% for m in team %}<div class="d-flex align-items-center gap-2 py-1"><span class="avatar-circle" style="width:28px;height:28px;font-size:.72rem">{{ m.first_name|first|default:m.username|first|upper }}</span><span style="font-size:.88rem;font-weight:600">{{ m.get_full_name|default:m.username }}</span></div>{% endfor %}
+                {% else %}<p class="text-muted mb-0" style="font-size:.85rem">Пригласите соавторов по логину.</p>{% endif %}
             </div>
         </div>
         {% endif %}
 
         <div class="card fade-up mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-files text-primary me-2"></i>Документы</span>
+            <div class="card-header d-flex justify-content-between align-items-center"><span><i class="bi bi-files text-primary me-2"></i>Документы</span>
                 {% if can_upload %}<a href="{% url 'document_upload' project.pk %}" class="btn btn-soft btn-sm"><i class="bi bi-upload"></i> Загрузить</a>{% endif %}
             </div>
             <div class="card-body">
@@ -152,28 +195,23 @@
                 <div class="doc-item">
                     <span class="doc-icon"><i class="bi bi-file-earmark-arrow-down"></i></span>
                     <div class="flex-grow-1" style="min-width:0">
-                        <a href="{{ doc.file.url }}" class="fw-bold d-block text-truncate" style="font-size:.88rem" download>{{ doc.description }}</a>
-                        <span class="comment-meta">{{ doc.uploaded_at|date:"d.m.Y H:i" }}</span>
+                        <a href="{{ doc.file.url }}" target="_blank" class="fw-bold d-block text-truncate" style="font-size:.88rem">{{ doc.description }}</a>
+                        <span class="comment-meta">{{ doc.uploaded_at|date:"d.m.Y H:i" }} · <a href="{{ doc.file.url }}" download>скачать</a></span>
                     </div>
                     {% if can_delete %}<form method="post" action="{% url 'document_delete' doc.pk %}" onsubmit="return confirm('Удалить документ?')">{% csrf_token %}<button class="btn btn-soft-danger btn-sm"><i class="bi bi-x-lg"></i></button></form>{% endif %}
                 </div>
-                {% empty %}<p class="text-muted mb-0" style="font-size:.88rem">Документы не загружены.{% if can_upload %} Добавьте презентацию или пояснительную записку.{% endif %}</p>{% endfor %}
+                {% empty %}<p class="text-muted mb-0" style="font-size:.88rem">Документы не загружены.{% if can_upload %} Добавьте презентацию или записку.{% endif %}</p>{% endfor %}
             </div>
         </div>
 
         {% if status_history %}
         <div class="card fade-up mb-4">
             <div class="card-header"><i class="bi bi-clock-history text-primary me-2"></i>История статусов</div>
-            <div class="card-body">
-                <ul class="timeline">
-                    {% for h in status_history %}
-                    <li><span class="dot"><i class="bi bi-arrow-right" style="font-size:.6rem"></i></span>
-                        <div class="t-title" style="font-size:.85rem">{{ h.get_new_display }}</div>
-                        <div class="t-meta">{{ h.created_at|date:"d.m.Y H:i" }} · {% if h.changed_by %}{{ h.changed_by.username }}{% else %}система{% endif %}</div>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </div>
+            <div class="card-body"><ul class="timeline">
+                {% for h in status_history %}<li><span class="dot"><i class="bi bi-arrow-right" style="font-size:.6rem"></i></span>
+                    <div class="t-title" style="font-size:.85rem">{{ h.get_new_display }}</div>
+                    <div class="t-meta">{{ h.created_at|date:"d.m.Y H:i" }} · {% if h.changed_by %}{{ h.changed_by.username }}{% else %}система{% endif %}</div></li>{% endfor %}
+            </ul></div>
         </div>
         {% endif %}
     </div>
@@ -183,72 +221,82 @@
 {% block extra_js %}
 <script>
 $(function () {
+    const csrf = getCookie('csrftoken');
     $('#vote-btn').on('click', function () {
         const btn = $(this); btn.prop('disabled', true);
-        $.ajax({ url: '/projects/' + btn.data('project-id') + '/vote/', type: 'POST',
-            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        $.ajax({ url: '/projects/' + btn.data('project-id') + '/vote/', type: 'POST', headers: { 'X-CSRFToken': csrf },
             success: function (r) {
-                if (r.success) {
-                    $('#votes-count').text(r.votes);
-                    btn.toggleClass('voted', r.voted);
+                if (r.success) { $('#votes-count').text(r.votes); btn.toggleClass('voted', r.voted);
                     btn.find('i').attr('class', r.voted ? 'bi bi-heart-fill me-1' : 'bi bi-heart me-1');
                     btn.find('span').text(r.voted ? 'Ваш голос учтён' : 'Голосовать');
-                } else { alert(r.message || 'Ошибка'); }
+                    showToast(r.voted ? 'Голос учтён!' : 'Голос снят.', 'success');
+                } else { showToast(r.message || 'Ошибка', 'danger'); }
             },
-            error: function (xhr) { alert(xhr.responseJSON && xhr.responseJSON.message || 'Ошибка сети'); },
+            error: function (xhr) { showToast(xhr.responseJSON && xhr.responseJSON.message || 'Ошибка сети', 'danger'); },
             complete: function () { btn.prop('disabled', false); } });
     });
-
     $('#status-select').on('change', function () {
         const select = $(this);
-        $.ajax({ url: '/projects/' + select.data('project-id') + '/change-status/', type: 'POST',
-            data: { status: select.val() }, headers: { 'X-CSRFToken': getCookie('csrftoken') },
-            success: function (r) { if (r.success) { $('#status-display').attr('class', 'status-badge status-' + r.status).text(r.status_display); } else { alert('Ошибка: ' + r.message); } },
-            error: function (xhr) { alert('Ошибка: ' + xhr.status); } });
+        $.ajax({ url: '/projects/' + select.data('project-id') + '/change-status/', type: 'POST', data: { status: select.val() }, headers: { 'X-CSRFToken': csrf },
+            success: function (r) { if (r.success) { $('#status-display').attr('class', 'status-badge status-' + r.status).text(r.status_display); showToast('Статус обновлён', 'success'); } else { showToast('Ошибка: ' + r.message, 'danger'); } },
+            error: function (xhr) { showToast('Ошибка: ' + xhr.status, 'danger'); } });
     });
-
     function esc(s) { return $('<div>').text(s).html(); }
     function mentionize(s) { return esc(s).replace(/@([A-Za-z0-9_]{3,30})/g, '<span class="mention">@$1</span>'); }
     function commentHtml(c) {
-        return '<div class="comment-item" id="comment-' + c.id + '">' +
-            '<span class="avatar-circle">' + esc(c.author.charAt(0).toUpperCase()) + '</span>' +
+        return '<div class="comment-item" id="comment-' + c.id + '"><span class="avatar-circle">' + esc(c.author.charAt(0).toUpperCase()) + '</span>' +
             '<div class="flex-grow-1" style="min-width:0"><div class="comment-bubble">' +
-            '<div class="d-flex justify-content-between"><span class="comment-author">' + esc(c.author) + '</span>' +
-            '<span class="comment-meta">' + esc(c.created_at) + '</span></div>' +
-            '<div style="font-size:.9rem">' + mentionize(c.text) + '</div>' +
+            '<div class="d-flex justify-content-between"><span class="comment-author">' + esc(c.author) + '</span><span class="comment-meta">' + esc(c.created_at) + '</span></div>' +
+            '<div class="c-text" style="font-size:.9rem">' + mentionize(c.text) + '</div>' +
             '<button class="reply-btn mt-1" data-id="' + c.id + '" data-author="' + esc(c.author) + '"><i class="bi bi-reply"></i> Ответить</button>' +
             '</div><div class="comment-replies"></div></div></div>';
     }
     $(document).on('click', '.reply-btn', function () {
         $('#comment-parent-id').val($(this).data('id'));
-        $('#reply-hint').show().html('Ответ пользователю <b>@' + esc($(this).data('author')) + '</b> · <a href="#" id="cancel-reply">отменить</a>');
+        $('#reply-hint').show().html('Ответ <b>@' + esc($(this).data('author')) + '</b> · <a href="#" id="cancel-reply">отменить</a>');
         $('#comment-text').focus();
     });
-    $(document).on('click', '#cancel-reply', function (e) {
-        e.preventDefault(); $('#comment-parent-id').val(''); $('#reply-hint').hide();
-    });
+    $(document).on('click', '#cancel-reply', function (e) { e.preventDefault(); $('#comment-parent-id').val(''); $('#reply-hint').hide(); });
     $('#add-comment-btn').on('click', function () {
         const btn = $(this); const text = $('#comment-text').val().trim();
-        if (!text) { alert('Введите текст комментария'); return; }
+        if (!text) { showToast('Введите текст комментария', 'warning'); return; }
         btn.prop('disabled', true);
-        $.ajax({ url: '/projects/' + btn.data('project-id') + '/add-comment/', type: 'POST',
-            data: { text: text, parent_id: $('#comment-parent-id').val() },
-            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        $.ajax({ url: '/projects/' + btn.data('project-id') + '/add-comment/', type: 'POST', data: { text: text, parent_id: $('#comment-parent-id').val() }, headers: { 'X-CSRFToken': csrf },
             success: function (r) {
-                if (r.success) {
-                    $('#no-comments').remove();
-                    const html = commentHtml(r.comment);
-                    if (r.comment.parent_id) {
-                        let parent = $('#comment-' + r.comment.parent_id);
-                        let replies = parent.find('.comment-replies').first();
-                        if (!replies.length) { parent.find('.flex-grow-1').first().append('<div class="comment-replies"></div>'); replies = parent.find('.comment-replies').first(); }
-                        replies.append(html);
+                if (r.success) { $('#no-comments').remove(); const html = commentHtml(r.comment);
+                    if (r.comment.parent_id) { let p = $('#comment-' + r.comment.parent_id); let rep = p.find('.comment-replies').first();
+                        if (!rep.length) { p.find('.flex-grow-1').first().append('<div class="comment-replies"></div>'); rep = p.find('.comment-replies').first(); } rep.append(html);
                     } else { $('#comments-list').append(html); }
-                    $('#comment-text').val(''); $('#comment-parent-id').val(''); $('#reply-hint').hide();
-                } else { alert(r.message || 'Ошибка'); }
+                    $('#comment-text').val(''); $('#comment-parent-id').val(''); $('#reply-hint').hide(); showToast('Комментарий добавлен', 'success');
+                } else { showToast(r.message || 'Ошибка', 'danger'); }
             },
-            error: function () { alert('Ошибка сети'); },
-            complete: function () { btn.prop('disabled', false); } });
+            error: function () { showToast('Ошибка сети', 'danger'); }, complete: function () { btn.prop('disabled', false); } });
+    });
+    $(document).on('click', '.c-del', function () {
+        if (!confirm('Удалить комментарий?')) return;
+        const id = $(this).data('id');
+        $.post('/comments/' + id + '/delete/', { csrfmiddlewaretoken: csrf }, function (r) {
+            if (r.success) { $('#comment-' + id).remove(); showToast('Комментарий удалён', 'success'); }
+        }, 'json').fail(function () { showToast('Нет прав', 'danger'); });
+    });
+    $(document).on('click', '.c-edit', function () {
+        const item = $('#comment-' + $(this).data('id'));
+        const textEl = item.find('.c-text').first();
+        const current = textEl.text().trim();
+        const nv = prompt('Редактировать комментарий:', current);
+        if (nv === null) return;
+        const id = $(this).data('id');
+        $.post('/comments/' + id + '/edit/', { text: nv, csrfmiddlewaretoken: csrf }, function (r) {
+            if (r.success) { textEl.html(mentionize(r.text)); showToast('Комментарий обновлён', 'success'); }
+            else { showToast(r.message || 'Ошибка', 'danger'); }
+        }, 'json').fail(function () { showToast('Нет прав', 'danger'); });
+    });
+    $(document).on('click', '.task-toggle', function () {
+        const btn = $(this); const id = btn.data('id');
+        $.post('/mentor-tasks/' + id + '/toggle/', { csrfmiddlewaretoken: csrf }, function (r) {
+            if (r.success) { const item = $('#task-' + id); item.toggleClass('done', r.done);
+                btn.html(r.done ? '<i class="bi bi-check-lg"></i>' : ''); }
+        }, 'json');
     });
 });
 </script>
