@@ -5,12 +5,29 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 
 
+def _limit_size(file, mb):
+    if file.size > mb * 1024 * 1024:
+        raise ValidationError(f'Файл слишком большой (максимум {mb} МБ).')
+
+
+def validate_cover_size(file):
+    _limit_size(file, 5)
+
+
+def validate_document_size(file):
+    _limit_size(file, 10)
+
+
 class Contest(models.Model):
     name = models.CharField('Название', max_length=200)
     description = models.TextField('Описание')
     start_date = models.DateField('Дата начала')
     end_date = models.DateField('Дата окончания')
     is_active = models.BooleanField('Активен', default=True)
+    cover = models.ImageField('Обложка', upload_to='covers/', blank=True, null=True,
+                              validators=[validate_cover_size])
+    results_finalized = models.BooleanField('Итоги подведены', default=False)
+    finalized_at = models.DateTimeField('Дата подведения итогов', blank=True, null=True)
     organizer = models.ForeignKey(User, on_delete=models.CASCADE,
                                   related_name='organized_contests',
                                   verbose_name='Организатор')
@@ -34,19 +51,6 @@ class Contest(models.Model):
     @property
     def days_left(self):
         return (self.end_date - timezone.localdate()).days
-
-
-def _limit_size(file, mb):
-    if file.size > mb * 1024 * 1024:
-        raise ValidationError(f'Файл слишком большой (максимум {mb} МБ).')
-
-
-def validate_cover_size(file):
-    _limit_size(file, 5)
-
-
-def validate_document_size(file):
-    _limit_size(file, 10)
 
 
 class Stage(models.Model):
@@ -86,6 +90,10 @@ class Project(models.Model):
     mentor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True,
                                blank=True, related_name='mentored_projects',
                                verbose_name='Наставник')
+    team = models.ManyToManyField(User, related_name='team_projects', blank=True,
+                                  verbose_name='Команда')
+    cover = models.ImageField('Обложка', upload_to='covers/', blank=True, null=True,
+                              validators=[validate_cover_size])
     status = models.CharField('Статус', max_length=20,
                               choices=STATUS_CHOICES, default='draft')
     votes = models.PositiveIntegerField('Голоса', default=0)
@@ -163,6 +171,7 @@ class Evaluation(models.Model):
         verbose_name = 'Оценка'
         verbose_name_plural = 'Оценки'
         unique_together = ['project', 'expert', 'criterion']
+        indexes = [models.Index(fields=['project'])]
 
     def __str__(self):
         return f'{self.project.title} — {self.criterion.name}: {self.score}'
@@ -173,6 +182,8 @@ class Comment(models.Model):
                                 related_name='comments', verbose_name='Проект')
     author = models.ForeignKey(User, on_delete=models.CASCADE,
                                verbose_name='Автор')
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, blank=True, null=True,
+                               related_name='replies', verbose_name='Ответ на')
     text = models.TextField('Текст')
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -188,7 +199,8 @@ class Comment(models.Model):
 class Document(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE,
                                 related_name='documents', verbose_name='Проект')
-    file = models.FileField(upload_to='documents/%Y/%m/%d/', verbose_name='Файл')
+    file = models.FileField(upload_to='documents/%Y/%m/%d/', verbose_name='Файл',
+                            validators=[validate_document_size])
     description = models.CharField('Описание', max_length=255)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
