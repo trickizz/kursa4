@@ -1,23 +1,24 @@
 from django import forms
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User
 from django.db.models import Q
+from django.utils import timezone
 
-from .models import Contest, Project, Comment, Document, Evaluation, Criterion, Stage
-from .roles import ROLE_INFO, SELF_SIGNUP_ROLES, ALL_ROLES, ROLE_MENTOR, set_role
+from .models import (Contest, Project, Comment, Document, Evaluation, Criterion,
+                     Stage, TeamInvite)
+from .roles import ROLE_INFO, SELF_SIGNUP_ROLES, ALL_ROLES, ROLE_MENTOR, ROLE_EXPERT, set_role
 
 
 class ContestForm(forms.ModelForm):
     class Meta:
         model = Contest
-        fields = ['name', 'description', 'start_date', 'end_date', 'is_active']
+        fields = ['name', 'description', 'start_date', 'end_date', 'is_active', 'cover']
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control',
-                                           'placeholder': 'Например: Конкурс проектов 2026'}),
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 5,
-                                                 'placeholder': 'Кратко опишите конкурс'}),
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Например: Конкурс проектов 2026'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 5, 'placeholder': 'Кратко опишите конкурс'}),
             'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'end_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'cover': forms.ClearableFileInput(attrs={'class': 'form-control dropzone', 'accept': 'image/*'}),
         }
 
     def clean(self):
@@ -36,8 +37,7 @@ class StageForm(forms.ModelForm):
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Название этапа'}),
             'order': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
             'deadline': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2,
-                                                 'placeholder': 'Что нужно сделать на этом этапе'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Что нужно сделать на этом этапе'}),
         }
 
 
@@ -54,21 +54,22 @@ class CriterionForm(forms.ModelForm):
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
-        fields = ['title', 'summary', 'contest']
+        fields = ['title', 'summary', 'contest', 'cover']
         widgets = {
-            'title': forms.TextInput(attrs={'class': 'form-control',
-                                            'placeholder': 'Название проекта'}),
-            'summary': forms.Textarea(attrs={'class': 'form-control', 'rows': 5,
-                                             'placeholder': 'Краткое описание'}),
+            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Название проекта'}),
+            'summary': forms.Textarea(attrs={'class': 'form-control', 'rows': 5, 'placeholder': 'Краткое описание'}),
             'contest': forms.Select(attrs={'class': 'form-select'}),
+            'cover': forms.ClearableFileInput(attrs={'class': 'form-control dropzone', 'accept': 'image/*'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        queryset = Contest.objects.filter(is_active=True)
+        open_contests = Contest.objects.filter(is_active=True, results_finalized=False,
+                                               end_date__gte=timezone.localdate())
         if self.instance.pk:
-            queryset = Contest.objects.filter(
-                Q(is_active=True) | Q(pk=self.instance.contest_id))
+            queryset = Contest.objects.filter(Q(pk__in=open_contests) | Q(pk=self.instance.contest_id))
+        else:
+            queryset = open_contests
         self.fields['contest'].queryset = queryset
 
 
@@ -82,10 +83,7 @@ class CommentForm(forms.ModelForm):
     class Meta:
         model = Comment
         fields = ['text']
-        widgets = {
-            'text': forms.Textarea(attrs={'class': 'form-control', 'rows': 3,
-                                          'placeholder': 'Ваш комментарий...'}),
-        }
+        widgets = {'text': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Ваш комментарий...'})}
 
 
 class DocumentForm(forms.ModelForm):
@@ -93,15 +91,12 @@ class DocumentForm(forms.ModelForm):
         model = Document
         fields = ['file', 'description']
         widgets = {
-            'file': forms.ClearableFileInput(attrs={'class': 'form-control'}),
-            'description': forms.TextInput(attrs={'class': 'form-control',
-                                                  'placeholder': 'Описание файла'}),
+            'file': forms.ClearableFileInput(attrs={'class': 'form-control dropzone'}),
+            'description': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Описание файла'}),
         }
 
 
 class EvaluationForm(forms.ModelForm):
-    """Оценка эксперта: критерий должен относиться к конкурсу проекта,
-    балл не выше максимума, без дублей и без оценки собственного проекта."""
     class Meta:
         model = Evaluation
         fields = ['project', 'criterion', 'score', 'comment']
@@ -110,8 +105,7 @@ class EvaluationForm(forms.ModelForm):
             'project': forms.Select(attrs={'class': 'form-select'}),
             'criterion': forms.Select(attrs={'class': 'form-select'}),
             'score': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
-            'comment': forms.Textarea(attrs={'class': 'form-control', 'rows': 3,
-                                             'placeholder': 'Обоснование оценки (необязательно)'}),
+            'comment': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Обоснование оценки (необязательно)'}),
         }
 
     def __init__(self, *args, expert=None, **kwargs):
@@ -119,100 +113,113 @@ class EvaluationForm(forms.ModelForm):
         self.expert = expert
         projects = Project.objects.exclude(status='draft').select_related('contest')
         if expert is not None:
-            projects = projects.exclude(participant=expert)
+            projects = projects.exclude(participant=expert).exclude(team=expert)
         self.fields['project'].queryset = projects
         self.fields['criterion'].queryset = Criterion.objects.select_related('contest')
-
         project_id = self.data.get('project') or self.initial.get('project')
         if project_id:
             try:
                 project = Project.objects.get(pk=project_id)
-                self.fields['criterion'].queryset = Criterion.objects.filter(
-                    contest=project.contest)
+                self.fields['criterion'].queryset = Criterion.objects.filter(contest=project.contest)
             except (Project.DoesNotExist, ValueError, TypeError):
                 pass
 
     def clean(self):
         cleaned = super().clean()
-        project = cleaned.get('project')
-        criterion = cleaned.get('criterion')
-        score = cleaned.get('score')
-
+        project, criterion, score = cleaned.get('project'), cleaned.get('criterion'), cleaned.get('score')
         if project and criterion and criterion.contest_id != project.contest_id:
-            raise forms.ValidationError(
-                'Критерий не относится к конкурсу выбранного проекта.')
+            raise forms.ValidationError('Критерий не относится к конкурсу выбранного проекта.')
         if criterion and score is not None and score > criterion.max_score:
-            raise forms.ValidationError(
-                f'Балл не может превышать {criterion.max_score} '
-                f'по критерию «{criterion.name}».')
-        if project and self.expert and project.participant_id == self.expert.pk:
-            raise forms.ValidationError('Нельзя оценивать собственный проект.')
-        if project and criterion and self.expert:
-            duplicates = Evaluation.objects.filter(
-                project=project, criterion=criterion, expert=self.expert)
+            raise forms.ValidationError(f'Балл не может превышать {criterion.max_score} по критерию «{criterion.name}».')
+        if project and self.expert:
+            if project.participant_id == self.expert.pk or project.team.filter(pk=self.expert.pk).exists():
+                raise forms.ValidationError('Нельзя оценивать проект своей команды.')
+            assignments = project.expert_assignments.all()
+            if assignments.exists() and not assignments.filter(expert=self.expert).exists():
+                raise forms.ValidationError('Этот проект закреплён за другими экспертами.')
+            duplicates = Evaluation.objects.filter(project=project, criterion=criterion, expert=self.expert)
             if self.instance.pk:
                 duplicates = duplicates.exclude(pk=self.instance.pk)
-            if duplicates.exists():
-                raise forms.ValidationError(
-                    'Вы уже оценили этот проект по выбранному критерию.')
+            if criterion and duplicates.exists():
+                raise forms.ValidationError('Вы уже оценили этот проект по выбранному критерию.')
         return cleaned
 
 
 class MentorAssignForm(forms.Form):
-    """Назначение наставника проекту (организатор/админ)."""
     mentor = forms.ModelChoiceField(
         label='Наставник',
         queryset=User.objects.filter(groups__name=ROLE_MENTOR).order_by('username'),
-        required=False,
-        empty_label='— Без наставника —',
+        required=False, empty_label='— Без наставника —',
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
+
+
+class ExpertAssignForm(forms.Form):
+    expert = forms.ModelChoiceField(
+        label='Эксперт', queryset=User.objects.filter(groups__name=ROLE_EXPERT),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
+    def __init__(self, *args, project=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if project is not None:
+            member_ids = [project.participant_id] + list(project.team.values_list('pk', flat=True))
+            self.fields['expert'].queryset = (
+                User.objects.filter(groups__name=ROLE_EXPERT)
+                .exclude(pk__in=member_ids)
+                .exclude(expert_assignments__project=project)
+                .order_by('username'))
+
+
+class TeamInviteForm(forms.Form):
+    username = forms.CharField(label='Логин соавтора', max_length=150,
+                               widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'username'}))
+
+    def __init__(self, *args, project=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.project = project
+
+    def clean_username(self):
+        username = self.cleaned_data['username'].strip()
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            raise forms.ValidationError('Пользователь с таким логином не найден.')
+        if self.project:
+            if user.pk == self.project.participant_id or self.project.team.filter(pk=user.pk).exists():
+                raise forms.ValidationError('Этот пользователь уже в команде.')
+            if TeamInvite.objects.filter(project=self.project, user=user, status='pending').exists():
+                raise forms.ValidationError('Приглашение уже отправлено.')
+        return username
 
 
 class RoleAssignForm(forms.Form):
-    """Смена роли пользователя администратором."""
     user_id = forms.IntegerField(widget=forms.HiddenInput)
-    role = forms.ChoiceField(
-        choices=[(role, ROLE_INFO[role]['label']) for role in ALL_ROLES],
-        widget=forms.Select(attrs={'class': 'form-select form-select-sm'}),
-    )
+    role = forms.ChoiceField(choices=[(r, ROLE_INFO[r]['label']) for r in ALL_ROLES],
+                             widget=forms.Select(attrs={'class': 'form-select form-select-sm'}))
 
 
 class ImportCSVForm(forms.Form):
-    csv_file = forms.FileField(
-        label='CSV-файл',
-        widget=forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': '.csv'}),
-        help_text='Колонки: Название; Конкурс; Участник; Описание; Статус (разделитель «;»)',
-    )
+    csv_file = forms.FileField(label='CSV-файл',
+                               widget=forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': '.csv'}),
+                               help_text='Колонки: Название; Конкурс; Участник; Описание; Статус (разделитель «;»)')
 
 
 class RegisterForm(forms.ModelForm):
-    password1 = forms.CharField(
-        label='Пароль',
-        widget=forms.PasswordInput(attrs={'class': 'form-control',
-                                          'placeholder': 'Минимум 8 символов'}),
-        min_length=8,
-    )
-    password2 = forms.CharField(
-        label='Повторите пароль',
-        widget=forms.PasswordInput(attrs={'class': 'form-control',
-                                          'placeholder': 'Введите пароль ещё раз'}),
-    )
-    role = forms.ChoiceField(
-        label='Роль в системе',
-        choices=[(role, f"{ROLE_INFO[role]['label']} — {ROLE_INFO[role]['description']}")
-                 for role in SELF_SIGNUP_ROLES],
-        widget=forms.Select(attrs={'class': 'form-select'}),
-    )
+    password1 = forms.CharField(label='Пароль', min_length=8,
+                                widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Минимум 8 символов'}))
+    password2 = forms.CharField(label='Повторите пароль',
+                                widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Введите пароль ещё раз'}))
+    role = forms.ChoiceField(label='Роль в системе',
+                             choices=[(r, f"{ROLE_INFO[r]['label']} — {ROLE_INFO[r]['description']}") for r in SELF_SIGNUP_ROLES],
+                             widget=forms.Select(attrs={'class': 'form-select'}))
 
     class Meta:
         model = User
         fields = ['username', 'email', 'first_name', 'last_name']
         widgets = {
-            'username': forms.TextInput(attrs={'class': 'form-control',
-                                               'placeholder': 'Логин (латиница, без пробелов)'}),
-            'email': forms.EmailInput(attrs={'class': 'form-control',
-                                             'placeholder': 'you@example.com'}),
+            'username': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Логин (латиница, без пробелов)'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'you@example.com'}),
             'first_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Имя'}),
             'last_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Фамилия'}),
         }
