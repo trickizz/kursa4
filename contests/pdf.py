@@ -1,4 +1,4 @@
-"""Генерация PDF-протокола результатов конкурса (fpdf2, шрифт Play с кириллицей)."""
+"""Генерация PDF-протокола результатов конкурса (fpdf2, шрифт Russo One с кириллицей)."""
 from pathlib import Path
 
 from django.conf import settings
@@ -24,8 +24,8 @@ class ResultsPDF(FPDF):
 
 def generate_results_pdf(contest):
     pdf = ResultsPDF()
-    pdf.add_font('DejaVu', '', str(FONT_DIR / 'Play-Regular.ttf'))
-    pdf.add_font('DejaVu', 'B', str(FONT_DIR / 'Play-Bold.ttf'))
+    pdf.add_font('DejaVu', '', str(FONT_DIR / 'RussoOne-Regular.ttf'))
+    pdf.add_font('DejaVu', 'B', str(FONT_DIR / 'RussoOne-Regular.ttf'))
     pdf.alias_nb_pages()
     pdf.set_auto_page_break(auto=True, margin=18)
     pdf.add_page()
