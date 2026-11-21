@@ -1,5 +1,6 @@
 from .roles import (ROLE_INFO, primary_role, is_site_admin, is_organizer,
                     is_expert, is_mentor, is_participant)
+from .models import Notification
 
 
 def roles(request):
@@ -20,3 +21,12 @@ def roles(request):
         'is_mentor': is_mentor(user),
         'is_participant': is_participant(user),
     }
+
+
+def notifications(request):
+    """Непрочитанные уведомления для колокольчика в шапке."""
+    user = getattr(request, 'user', None)
+    if user is None or not user.is_authenticated:
+        return {}
+    unread = Notification.objects.filter(recipient=user, is_read=False)
+    return {'notif_unread': unread.count(), 'notif_recent': unread[:7]}
