@@ -158,7 +158,7 @@ Dockerfile, docker-compose.yml, .github/workflows/tests.yml
 - **DRF**: throttling (anon 60/min, user 240/min) + **django-filter** (фильтрация в API).
 - **CI**: сборка Docker-образа, **динамический бейдж покрытия** (авто-коммит), dependabot.
 - Команды: `close_expired` (автозакрытие по cron), `send_deadline_reminders`, `backup` (дамп данных).
-- **90 автотестов**, покрытие ~95%, ruff.
+- **117 автотестов**, покрытие ~96%, ruff.
 
 ### Cron-команды
 
@@ -198,7 +198,7 @@ curl "/api/contests/?is_active=true"
 - Логи `fontTools` приглушены до WARNING.
 - Гигиена репозитория: из git убраны `.coverage`, `.ruff_cache/` и дампы `backups/`
   (содержали хэши паролей), починен `.gitignore`.
-- **+16 тестов** (паритет API, рейтинг, медиа-безопасность, PDF, троттлинг, SSE) — всего **90**.
+- **+43 теста** (паритет API, рейтинг, медиа-безопасность, PDF, троттлинг, SSE, CRUD организатора, команда, CSV, seed_demo) — всего **117**, покрытие **96%**.
 
 ## 🛠 Технологии
 
