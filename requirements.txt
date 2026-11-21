@@ -1,3 +1,11 @@
-Django>=4.2
+Django>=4.2,<5.3
 django-jazzmin>=3.0
-Pillow
+Pillow>=9.1
+django-environ>=0.11
+whitenoise>=6.6
+djangorestframework>=3.15
+drf-spectacular>=0.27
+django-ratelimit>=4.1
+fpdf2>=2.7
+gunicorn>=21.2
+psycopg2-binary>=2.9
