@@ -10,4 +10,4 @@ fpdf2>=2.7
 gunicorn>=21.2
 psycopg2-binary>=2.9
 openpyxl>=3.1
-django-filter>=24.1
+django-filter>=26.2
