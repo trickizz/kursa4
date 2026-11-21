@@ -1,2 +1,2 @@
-DejaVu fonts — free license (Bitstream Vera + public domain DejaVu changes).
-https://dejavu-fonts.github.io/License.html
+Play font by Jonas Hecksher — SIL Open Font License 1.1.
+https://fonts.google.com/specimen/Play
