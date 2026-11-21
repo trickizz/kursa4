@@ -6,20 +6,27 @@ from django.views.generic import (ListView, DetailView, CreateView, UpdateView,
                                   DeleteView, TemplateView, FormView)
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
-from django.db.models import Count, Q, Sum
-from django.http import JsonResponse, Http404
+from django.db.models import Count, Q, Sum, Avg
+from django.http import JsonResponse, Http404, HttpResponse, StreamingHttpResponse, FileResponse
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from django.core.cache import cache
 from django_ratelimit.decorators import ratelimit
+import json
+import os
+import time
+from django.conf import settings
+from django.db import connection
 
 from .models import (Contest, Project, Evaluation, Comment, Criterion, Stage,
                      Document, ProjectVote, Notification, StatusChange,
-                     ExpertAssignment, TeamInvite, Achievement, UserAchievement)
+                     ExpertAssignment, TeamInvite, Achievement, UserAchievement,
+                     Appeal, MentorTask, Tag, ResultSnapshot)
 from .forms import (ContestForm, ProjectForm, ProjectSubmitForm, DocumentForm,
                     RegisterForm, EvaluationForm, StageForm, CriterionForm,
                     MentorAssignForm, ExpertAssignForm, TeamInviteForm,
-                    RoleAssignForm, ImportCSVForm)
+                    RoleAssignForm, ImportCSVForm, AppealForm, AppealResolveForm,
+                    MentorTaskForm, BulkActionForm)
 from .mixins import (OrganizerRequiredMixin, ExpertRequiredMixin,
                      ParticipantRequiredMixin, AdminRequiredMixin)
 from .roles import (is_site_admin, is_organizer, is_expert, primary_role,
@@ -120,7 +127,17 @@ class ProjectListView(ListView):
             queryset = queryset.filter(status=status)
         if query:
             queryset = queryset.filter(Q(title__icontains=query) | Q(summary__icontains=query))
-        return queryset
+        tag = self.request.GET.get('tag')
+        if tag:
+            queryset = queryset.filter(tags__name=tag)
+        sort = self.request.GET.get('sort', 'new')
+        if sort == 'votes':
+            queryset = queryset.order_by('-votes')
+        elif sort == 'old':
+            queryset = queryset.order_by('created_at')
+        elif sort == 'score':
+            queryset = queryset.annotate(avg_score=Avg('evaluations__score')).order_by('-avg_score')
+        return queryset.distinct()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -129,6 +146,9 @@ class ProjectListView(ListView):
         context['current_contest'] = self.request.GET.get('contest', '')
         context['current_status'] = self.request.GET.get('status', '')
         context['q'] = self.request.GET.get('q', '')
+        context['tags'] = Tag.objects.all()
+        context['current_tag'] = self.request.GET.get('tag', '')
+        context['current_sort'] = self.request.GET.get('sort', 'new')
         return context
 
 
@@ -164,6 +184,14 @@ class ProjectDetailView(DetailView):
         context['status_choices'] = Project.STATUS_CHOICES
         context['user_voted'] = (user.is_authenticated and
                                  ProjectVote.objects.filter(project=obj, user=user).exists())
+        context['tags'] = obj.tags.all()
+        context['weighted_score'] = obj.weighted_score_percent()
+        context['appeals'] = obj.appeals.select_related('author', 'evaluation__criterion')
+        context['appeal_form'] = AppealForm()
+        context['mentor_tasks'] = obj.mentor_tasks.all()
+        context['mentor_task_form'] = MentorTaskForm()
+        context['is_project_mentor'] = user.is_authenticated and obj.mentor_id == user.pk
+        context['contest_locked'] = obj.contest.results_finalized
         context['is_owner'] = is_owner
         context['can_edit'] = (is_owner and obj.is_editable_by_participant()) or can_manage
         context['can_submit'] = is_owner and obj.is_editable_by_participant() and obj.contest.is_open
@@ -440,6 +468,8 @@ def vote_project(request, pk):
     project = get_object_or_404(Project, pk=pk)
     if project.status == 'draft':
         return JsonResponse({'success': False, 'message': 'Нельзя голосовать за черновик.'}, status=400)
+    if project.contest.results_finalized:
+        return JsonResponse({'success': False, 'message': 'Итоги подведены — голосование заморожено.'}, status=400)
     if project.is_member(request.user):
         return JsonResponse({'success': False, 'message': 'Нельзя голосовать за проект своей команды.'}, status=400)
     vote, created = ProjectVote.objects.get_or_create(project=project, user=request.user)
@@ -629,11 +659,20 @@ class ContestResultsView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        projects = list(self.object.projects.exclude(status='draft').select_related('participant'))
-        projects.sort(key=lambda p: (p.score_percent(), p.votes), reverse=True)
-        context['ranked'] = projects
-        context['top3'] = projects[:3]
-        context['can_finalize'] = is_organizer(self.request.user) and not self.object.results_finalized
+        contest = self.object
+        snapshot = getattr(contest, 'result_snapshot', None)
+        if contest.results_finalized and snapshot:
+            context['snapshot'] = snapshot.data
+            context['ranked'] = []
+            context['top3'] = []
+        else:
+            projects = list(contest.projects.exclude(status='draft').select_related('participant'))
+            projects.sort(key=lambda p: (p.weighted_score_percent(), p.votes), reverse=True)
+            context['ranked'] = projects
+            context['top3'] = projects[:3]
+        context['progress'] = contest.evaluation_progress()
+        context['can_finalize'] = is_organizer(self.request.user) and contest.can_finalize
+        context['bulk_form'] = BulkActionForm(contest=contest)
         return context
 
 
@@ -647,6 +686,9 @@ def contest_finalize(request, pk):
     if contest.results_finalized:
         messages.info(request, 'Итоги уже подведены.')
         return redirect('contest_results', pk=pk)
+    if not contest.can_finalize:
+        messages.error(request, 'Нельзя подвести итоги: не все проекты полностью оценены экспертами.')
+        return redirect('contest_results', pk=pk)
     contest.results_finalized = True
     contest.finalized_at = timezone.now()
     contest.is_active = False
@@ -654,7 +696,11 @@ def contest_finalize(request, pk):
     for project in contest.projects.filter(status__in=['selected', 'in_progress']):
         set_project_status(project, 'completed', request.user)
     projects = list(contest.projects.exclude(status='draft'))
-    projects.sort(key=lambda p: (p.score_percent(), p.votes), reverse=True)
+    projects.sort(key=lambda p: (p.weighted_score_percent(), p.votes), reverse=True)
+    ResultSnapshot.objects.update_or_create(contest=contest, defaults={'data': [
+        {'rank': i, 'id': p.pk, 'title': p.title, 'participant': p.participant.username,
+         'score_percent': p.weighted_score_percent(), 'votes': p.votes,
+         'status': p.get_status_display()} for i, p in enumerate(projects, 1)]})
     if projects:
         winner = projects[0]
         for member in winner.all_members():
@@ -680,6 +726,10 @@ class RatingView(TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        cached = cache.get('rating_rows')
+        if cached is not None:
+            context['rows'] = cached
+            return context
         users = (User.objects.annotate(proj_count=Count('projects', distinct=True),
                                        votes_sum=Sum('projects__votes'),
                                        ach_count=Count('achievements', distinct=True))
@@ -692,6 +742,7 @@ class RatingView(TemplateView):
             rows.append({'user': user, 'projects': user.proj_count, 'votes': user.votes_sum or 0,
                          'avg_percent': avg_percent, 'achievements': user.ach_count, 'points': points})
         rows.sort(key=lambda r: r['points'], reverse=True)
+        cache.set('rating_rows', rows, 60)
         context['rows'] = rows
         return context
 

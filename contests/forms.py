@@ -146,6 +146,8 @@ class EvaluationForm(forms.ModelForm):
             raise forms.ValidationError('Критерий не относится к конкурсу выбранного проекта.')
         if criterion and score is not None and score > criterion.max_score:
             raise forms.ValidationError(f'Балл не может превышать {criterion.max_score} по критерию «{criterion.name}».')
+        if project and project.contest.results_finalized:
+            raise forms.ValidationError('Итоги конкурса подведены — оценки заморожены.')
         if project and self.expert:
             if project.participant_id == self.expert.pk or project.team.filter(pk=self.expert.pk).exists():
                 raise forms.ValidationError('Нельзя оценивать проект своей команды.')
