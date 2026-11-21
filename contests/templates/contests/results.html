@@ -1,0 +1,72 @@
+{% extends 'contests/base.html' %}
+{% block title %}Результаты — {{ contest.name }}{% endblock %}
+{% block content %}
+<section class="hero fade-up" style="padding:2.2rem">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+            <div class="d-flex gap-2 mb-2">
+                {% if contest.results_finalized %}<span class="hero-chip"><i class="bi bi-flag-fill"></i>Итоги подведены {{ contest.finalized_at|date:"d.m.Y" }}</span>
+                {% else %}<span class="hero-chip"><i class="bi bi-hourglass-split"></i>Предварительный рейтинг</span>{% endif %}
+            </div>
+            <h1 class="h3 mb-1"><i class="bi bi-bar-chart-line me-2"></i>{{ contest.name }}</h1>
+            <p class="lead mb-0" style="font-size:.95rem">Рейтинг по честному баллу (% от максимума) и голосам</p>
+        </div>
+        <div class="d-flex flex-column gap-2">
+            {% if contest.results_finalized or can_manage %}
+            <a href="{% url 'contest_results_pdf' contest.pk %}" class="btn btn-light"><i class="bi bi-file-earmark-pdf me-1"></i>PDF-протокол</a>
+            {% endif %}
+            {% if can_finalize %}
+            <form method="post" action="{% url 'contest_finalize' contest.pk %}" onsubmit="return confirm('Подвести итоги? Конкурс будет закрыт, отобранные проекты завершены, победитель получит достижение.')">
+                {% csrf_token %}<button class="btn btn-primary w-100"><i class="bi bi-flag me-1"></i>Подвести итоги</button>
+            </form>
+            {% endif %}
+            <a href="{% url 'contest_detail' contest.pk %}" class="btn btn-soft"><i class="bi bi-arrow-left me-1"></i>К конкурсу</a>
+        </div>
+    </div>
+</section>
+
+{% if top3 %}
+<div class="row g-3 mb-4">
+    {% for p in top3 %}
+    <div class="col-md-4">
+        <div class="card card-hover fade-up h-100 text-center"><div class="card-body p-4">
+            <div class="medal mb-2">{% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% else %}🥉{% endif %}</div>
+            <span class="rank-badge rank-{{ forloop.counter }} mx-auto mb-2">{{ forloop.counter }}</span>
+            <h5 class="mt-2"><a href="{% url 'project_detail' p.pk %}" class="text-dark">{{ p.title }}</a></h5>
+            <p class="text-muted mb-2" style="font-size:.85rem">{{ p.participant.username }}</p>
+            <div class="d-flex justify-content-center gap-2">
+                <span class="score-pill"><i class="bi bi-star-fill text-warning me-1"></i>{{ p.score_percent }}%</span>
+                <span class="meta-chip"><i class="bi bi-heart-fill text-danger"></i>{{ p.votes }}</span>
+            </div>
+        </div></div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="card fade-up">
+    <div class="card-header"><i class="bi bi-list-ol text-primary me-2"></i>Полный рейтинг <span class="meta-chip ms-2">{{ ranked|length }}</span></div>
+    <div class="card-body p-0">
+        {% if ranked %}
+        <div class="table-responsive"><table class="table table-clean">
+            <thead><tr><th style="width:60px">Место</th><th>Проект</th><th>Участник</th><th>Балл</th><th>Голоса</th><th>Оценок</th><th>Статус</th></tr></thead>
+            <tbody>
+            {% for p in ranked %}
+            <tr>
+                <td><span class="rank-badge {% if forloop.counter <= 3 %}rank-{{ forloop.counter }}{% endif %}">{{ forloop.counter }}</span></td>
+                <td><a href="{% url 'project_detail' p.pk %}" class="fw-bold text-dark">{{ p.title }}</a></td>
+                <td>{{ p.participant.username }}</td>
+                <td><span class="score-pill">{{ p.score_percent }}%</span></td>
+                <td><span class="meta-chip"><i class="bi bi-heart-fill text-danger"></i>{{ p.votes }}</span></td>
+                <td>{{ p.evaluations_count }}</td>
+                <td><span class="status-badge status-{{ p.status }}">{{ p.get_status_display }}</span></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+        {% else %}
+        <div class="empty-state"><div class="es-icon"><i class="bi bi-bar-chart"></i></div><h5>Пока нет проектов</h5><p>Рейтинг появится, когда участники подадут проекты.</p></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
