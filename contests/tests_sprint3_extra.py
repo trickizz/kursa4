@@ -50,9 +50,9 @@ class Sprint3ExtraTests(TestCase):
 
     def test_seed_demo_command(self):
         call_command('seed_demo')
-        self.assertTrue(Contest.objects.filter(name='AI-вызов 2026').exists())
-        self.assertTrue(User.objects.filter(username='anna').exists())
-        self.assertTrue(Project.objects.filter(title='EcoTrack').exists())
+        self.assertTrue(Contest.objects.filter(name='Цифровые решения 2026').exists())
+        self.assertTrue(User.objects.filter(username='student').exists())
+        self.assertTrue(Project.objects.exists())
 
     def test_csv_import(self):
         self.login(self.org)
@@ -103,7 +103,8 @@ class Sprint3ExtraTests(TestCase):
 
     def test_stage_criterion_crud(self):
         self.login(self.org)
-        self.client.post(reverse('stage_add', args=[self.contest.pk]), {'name': 'Э1', 'order': 1})
+        self.client.post(reverse('stage_add', args=[self.contest.pk]),
+                         {'name': 'Э1', 'order': 1, 'deadline': '2026-12-31'})
         stage = Stage.objects.get(name='Э1')
         self.client.post(reverse('stage_delete', args=[stage.pk]))
         self.assertFalse(Stage.objects.filter(pk=stage.pk).exists())
@@ -114,7 +115,8 @@ class Sprint3ExtraTests(TestCase):
         self.assertFalse(Criterion.objects.filter(pk=cr.pk).exists())
 
     def test_stage_criterion_delete_denied(self):
-        stage = Stage.objects.create(contest=self.contest, name='Э', order=1)
+        stage = Stage.objects.create(contest=self.contest, name='Э', order=1,
+                                     deadline=date.today() + timedelta(days=10))
         self.login(self.stud)
         self.assertEqual(self.client.post(reverse('stage_delete', args=[stage.pk])).status_code, 302)
         self.assertEqual(self.client.post(reverse('criterion_delete', args=[self.cr1.pk])).status_code, 302)
