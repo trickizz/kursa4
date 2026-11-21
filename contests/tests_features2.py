@@ -170,7 +170,8 @@ class Sprint2Tests(TestCase):
         self.login(self.org)
         self.client.post(reverse('bulk_action', args=[self.contest.pk]),
                          {'project_ids': [self.proj.pk, p2.pk], 'action': 'status', 'status': 'selected'})
-        self.proj.refresh_from_db(); p2.refresh_from_db()
+        self.proj.refresh_from_db()
+        p2.refresh_from_db()
         self.assertEqual(self.proj.status, 'selected')
         self.assertEqual(p2.status, 'selected')
 
