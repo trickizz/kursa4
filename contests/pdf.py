@@ -30,8 +30,12 @@ def generate_results_pdf(contest):
     pdf.set_auto_page_break(auto=True, margin=18)
     pdf.add_page()
 
+    pdf.set_fill_color(99, 102, 241)
+    pdf.set_text_color(255, 255, 255)
     pdf.set_font('DejaVu', 'B', 13)
-    pdf.cell(0, 9, contest.name, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.cell(0, 11, '  ' + contest.name, new_x=XPos.LMARGIN, new_y=YPos.NEXT, fill=True)
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(2)
     pdf.set_font('DejaVu', '', 10)
     pdf.multi_cell(0, 6, contest.description)
     pdf.ln(2)
@@ -56,17 +60,28 @@ def generate_results_pdf(contest):
     pdf.ln()
     pdf.set_font('DejaVu', '', 9)
     for i, p in enumerate(projects, 1):
-        row = [str(i), p.title[:36], p.participant.username[:20],
-               str(p.score_percent()), str(p.votes), p.get_status_display()[:16]]
+        row = [str(i), p.title[:34], p.participant.username[:19],
+               str(p.weighted_score_percent()), str(p.votes), p.get_status_display()[:20]]
+        pdf.set_fill_color(245, 247, 255) if i % 2 == 0 else pdf.set_fill_color(255, 255, 255)
         for w, val in zip(widths, row):
-            pdf.cell(w, 7, val, border=1)
+            pdf.cell(w, 7, val, border=1, fill=True)
         pdf.ln()
     if not projects:
         pdf.cell(0, 8, 'Проекты не подавались.', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
+    pdf.ln(6)
+    pdf.set_font('DejaVu', 'B', 10)
+    pdf.cell(0, 7, 'Критерии оценки (веса):', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.set_font('DejaVu', '', 9)
+    for c in contest.criteria.all():
+        pdf.cell(0, 6, f'  - {c.name}: макс. {c.max_score}, вес {c.weight}',
+                 new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.ln(8)
     pdf.set_font('DejaVu', '', 10)
-    pdf.cell(0, 7, 'Подпись организатора: ________________________',
+    pdf.cell(0, 7, 'Организатор: ____________________ / ____________________',
+             new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.ln(2)
+    pdf.cell(0, 7, 'Председатель жюри: ______________ / ____________________',
              new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     response = HttpResponse(bytes(pdf.output()), content_type='application/pdf')
