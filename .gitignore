@@ -6,4 +6,8 @@ db.sqlite3
 *.log
 media/
 staticfiles/
-.env
+.env.coverage
+htmlcov/
+.ruff_cache/
+*.whl
+.pytest_cache/

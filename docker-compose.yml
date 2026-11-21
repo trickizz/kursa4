@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: kursa4
+      POSTGRES_USER: kursa4
+      POSTGRES_PASSWORD: kursa4
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kursa4"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    command: sh -c "python manage.py migrate && python manage.py seed_demo && gunicorn contest_project.wsgi:application --bind 0.0.0.0:8000 --workers 3"
+    environment:
+      DEBUG: "False"
+      SECRET_KEY: "docker-demo-secret-key-change-me"
+      ALLOWED_HOSTS: "*"
+      DATABASE_URL: "postgres://kursa4:kursa4@db:5432/kursa4"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - media:/app/media
+
+volumes:
+  pgdata:
+  media:

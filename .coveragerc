@@ -1,0 +1,9 @@
+[run]
+source = contests
+omit =
+    */migrations/*
+    */tests*.py
+    contests/management/*
+
+[report]
+show_missing = True
