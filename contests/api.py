@@ -95,8 +95,18 @@ class EvaluationViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ['created_at', 'score']
 
 
+class MeSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    email = serializers.CharField()
+    full_name = serializers.CharField()
+    role = serializers.CharField()
+    role_label = serializers.CharField()
+    achievements = serializers.IntegerField()
+
+
 class MeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    serializer_class = MeSerializer
 
     def get(self, request):
         role = primary_role(request.user)
