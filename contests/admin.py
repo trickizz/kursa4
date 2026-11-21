@@ -1,5 +1,7 @@
 from django.contrib import admin
-from .models import Contest, Stage, Project, Criterion, Evaluation, Comment, Document, ProjectVote
+from .models import (Contest, Stage, Project, Criterion, Evaluation, Comment,
+                     Document, ProjectVote, Notification, StatusChange,
+                     ExpertAssignment, TeamInvite, Achievement, UserAchievement)
 
 
 @admin.register(Contest)
@@ -49,3 +51,35 @@ class DocumentAdmin(admin.ModelAdmin):
 class ProjectVoteAdmin(admin.ModelAdmin):
     list_display = ['project', 'user', 'created_at']
     list_filter = ['user']
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ['recipient', 'text', 'is_read', 'created_at']
+    list_filter = ['is_read']
+
+
+@admin.register(StatusChange)
+class StatusChangeAdmin(admin.ModelAdmin):
+    list_display = ['project', 'old_status', 'new_status', 'changed_by', 'created_at']
+
+
+@admin.register(ExpertAssignment)
+class ExpertAssignmentAdmin(admin.ModelAdmin):
+    list_display = ['project', 'expert', 'assigned_by', 'created_at']
+
+
+@admin.register(TeamInvite)
+class TeamInviteAdmin(admin.ModelAdmin):
+    list_display = ['project', 'user', 'status', 'created_at']
+    list_filter = ['status']
+
+
+@admin.register(Achievement)
+class AchievementAdmin(admin.ModelAdmin):
+    list_display = ['code', 'title', 'icon']
+
+
+@admin.register(UserAchievement)
+class UserAchievementAdmin(admin.ModelAdmin):
+    list_display = ['user', 'achievement', 'earned_at']

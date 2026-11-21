@@ -15,12 +15,12 @@ def export_projects_csv(queryset):
     response.write('\ufeff')
     writer = csv.writer(response, delimiter=';')
     writer.writerow(['ID', 'Название', 'Конкурс', 'Участник',
-                     'Наставник', 'Статус', 'Средний балл', 'Голоса'])
+                     'Наставник', 'Статус', 'Балл, %', 'Голоса'])
     for p in queryset:
         writer.writerow([
             p.id, p.title, p.contest.name, p.participant.username,
             p.mentor.username if p.mentor else '—',
-            p.get_status_display(), p.average_score(), p.votes,
+            p.get_status_display(), p.score_percent(), p.votes,
         ])
     return response
 
