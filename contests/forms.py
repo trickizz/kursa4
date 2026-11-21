@@ -4,7 +4,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from .models import (Contest, Project, Comment, Document, Evaluation, Criterion,
-                     Stage, TeamInvite)
+                     Stage, TeamInvite, Tag, Appeal, MentorTask)
 from .roles import ROLE_INFO, SELF_SIGNUP_ROLES, ALL_ROLES, ROLE_MENTOR, ROLE_EXPERT, set_role
 
 
@@ -44,17 +44,22 @@ class StageForm(forms.ModelForm):
 class CriterionForm(forms.ModelForm):
     class Meta:
         model = Criterion
-        fields = ['name', 'max_score']
+        fields = ['name', 'max_score', 'weight']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Например: Новизна идеи'}),
             'max_score': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+            'weight': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
         }
 
 
 class ProjectForm(forms.ModelForm):
+    tags = forms.CharField(label='Теги', required=False,
+                           widget=forms.TextInput(attrs={'class': 'form-control',
+                                                         'placeholder': 'через запятую: веб, ИИ, экология'}))
+
     class Meta:
         model = Project
-        fields = ['title', 'summary', 'contest', 'cover']
+        fields = ['title', 'summary', 'contest', 'cover', 'tags']
         widgets = {
             'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Название проекта'}),
             'summary': forms.Textarea(attrs={'class': 'form-control', 'rows': 5, 'placeholder': 'Краткое описание'}),
@@ -71,6 +76,16 @@ class ProjectForm(forms.ModelForm):
         else:
             queryset = open_contests
         self.fields['contest'].queryset = queryset
+        if self.instance.pk:
+            self.fields['tags'].initial = ', '.join(t.name for t in self.instance.tags.all())
+
+    def save(self, commit=True):
+        instance = super().save(commit=commit)
+        if commit:
+            names = [t.strip() for t in self.cleaned_data.get('tags', '').split(',') if t.strip()][:10]
+            tag_objs = [Tag.objects.get_or_create(name=n)[0] for n in names]
+            instance.tags.set(tag_objs)
+        return instance
 
 
 class ProjectSubmitForm(forms.ModelForm):
@@ -254,3 +269,41 @@ class RegisterForm(forms.ModelForm):
             user.save()
             set_role(user, self.cleaned_data['role'])
         return user
+
+
+class AppealForm(forms.ModelForm):
+    class Meta:
+        model = Appeal
+        fields = ['reason']
+        widgets = {'reason': forms.Textarea(attrs={'class': 'form-control', 'rows': 3,
+                                                   'placeholder': 'Почему вы не согласны с оценкой?'})}
+
+
+class AppealResolveForm(forms.Form):
+    status = forms.ChoiceField(label='Решение', choices=[('accepted', 'Удовлетворить'), ('rejected', 'Отклонить')],
+                               widget=forms.Select(attrs={'class': 'form-select'}))
+    resolution = forms.CharField(label='Комментарий', required=False,
+                                 widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}))
+
+
+class MentorTaskForm(forms.ModelForm):
+    class Meta:
+        model = MentorTask
+        fields = ['text']
+        widgets = {'text': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Новая задача для участника'})}
+
+
+class BulkActionForm(forms.Form):
+    project_ids = forms.MultipleChoiceField(widget=forms.CheckboxSelectMultiple, required=True)
+    action = forms.ChoiceField(choices=[('status', 'Сменить статус'), ('expert', 'Назначить эксперта')],
+                               widget=forms.Select(attrs={'class': 'form-select'}))
+    status = forms.ChoiceField(choices=Project.STATUS_CHOICES, required=False,
+                               widget=forms.Select(attrs={'class': 'form-select'}))
+    expert = forms.ModelChoiceField(queryset=User.objects.filter(groups__name=ROLE_EXPERT), required=False,
+                                    widget=forms.Select(attrs={'class': 'form-select'}))
+
+    def __init__(self, *args, contest=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if contest is not None:
+            self.fields['project_ids'].choices = [
+                (p.pk, p.title) for p in contest.projects.exclude(status='draft')]
