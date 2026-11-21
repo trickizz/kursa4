@@ -11,7 +11,7 @@ from django.http import JsonResponse, Http404
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from django.core.cache import cache
-from ratelimit.decorators import ratelimit
+from django_ratelimit.decorators import ratelimit
 
 from .models import (Contest, Project, Evaluation, Comment, Criterion, Stage,
                      Document, ProjectVote, Notification, StatusChange,
