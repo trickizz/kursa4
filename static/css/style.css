@@ -245,3 +245,16 @@ a { text-decoration: none; }
 [data-theme="dark"] .input-group-text { background: #0f172a; border-color: var(--line); color: var(--muted); }
 [data-theme="dark"] .card-header { border-color: var(--line); }
 [data-theme="dark"] hr { border-color: var(--line); opacity: 1; }
+
+/* Тосты AJAX-уведомлений */
+.toast-stack{position:fixed;right:1rem;bottom:1rem;z-index:1080;display:flex;flex-direction:column;gap:.5rem;max-width:340px}
+.app-toast{display:flex;align-items:flex-start;gap:.6rem;padding:.7rem .9rem;border-radius:12px;background:#fff;color:#1e293b;box-shadow:0 8px 24px rgba(15,23,42,.18);border-left:4px solid #6366f1;font-size:.88rem;opacity:0;transform:translateY(8px);transition:all .25s ease}
+.app-toast.show{opacity:1;transform:none}
+.app-toast-success{border-left-color:#10b981}.app-toast-success i{color:#10b981}
+.app-toast-danger{border-left-color:#ef4444}.app-toast-danger i{color:#ef4444}
+.app-toast-warning{border-left-color:#f59e0b}.app-toast-warning i{color:#f59e0b}
+.app-toast-info i{color:#6366f1}
+[data-theme="dark"] .app-toast{background:#1e293b;color:#e2e8f0;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+/* Непрочитанные уведомления */
+.notif-unread{background:#eef2ff}
+[data-theme="dark"] .notif-unread{background:rgba(99,102,241,.16)}

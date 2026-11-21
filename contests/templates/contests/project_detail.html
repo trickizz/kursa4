@@ -280,16 +280,22 @@ $(function () {
         }, 'json').fail(function () { showToast('Нет прав', 'danger'); });
     });
     $(document).on('click', '.c-edit', function () {
-        const item = $('#comment-' + $(this).data('id'));
-        const textEl = item.find('.c-text').first();
-        const current = textEl.text().trim();
-        const nv = prompt('Редактировать комментарий:', current);
-        if (nv === null) return;
         const id = $(this).data('id');
-        $.post('/comments/' + id + '/edit/', { text: nv, csrfmiddlewaretoken: csrf }, function (r) {
-            if (r.success) { textEl.html(mentionize(r.text)); showToast('Комментарий обновлён', 'success'); }
-            else { showToast(r.message || 'Ошибка', 'danger'); }
-        }, 'json').fail(function () { showToast('Нет прав', 'danger'); });
+        const item = $('#comment-' + id);
+        const textEl = item.find('.c-text').first();
+        if (item.find('.c-edit-box').length) return;
+        const box = $('<div class="c-edit-box mt-2"><textarea class="form-control form-control-sm" rows="2"></textarea><div class="d-flex gap-2 mt-1"><button class="btn btn-primary btn-sm c-save">Сохранить</button><button class="btn btn-soft btn-sm c-cancel">Отмена</button></div></div>');
+        box.find('textarea').val(textEl.text().trim());
+        textEl.hide().after(box);
+        box.find('.c-cancel').on('click', function () { box.remove(); textEl.show(); });
+        box.find('.c-save').on('click', function () {
+            const nv = box.find('textarea').val().trim();
+            if (!nv) { showToast('Комментарий не может быть пустым', 'warning'); return; }
+            $.post('/comments/' + id + '/edit/', { text: nv, csrfmiddlewaretoken: csrf }, function (r) {
+                if (r.success) { textEl.html(mentionize(r.text)).show(); box.remove(); showToast('Комментарий обновлён', 'success'); }
+                else { showToast(r.message || 'Ошибка', 'danger'); }
+            }, 'json').fail(function (xhr) { showToast(xhr.responseJSON && xhr.responseJSON.message || 'Нет прав', 'danger'); });
+        });
     });
     $(document).on('click', '.task-toggle', function () {
         const btn = $(this); const id = btn.data('id');
