@@ -23,11 +23,13 @@ class ProjectSerializer(serializers.ModelSerializer):
     participant = serializers.StringRelatedField(read_only=True)
     contest_name = serializers.CharField(source='contest.name', read_only=True)
     score_percent = serializers.FloatField(read_only=True)
+    weighted_score = serializers.FloatField(source='weighted_score_percent', read_only=True)
+    tags = serializers.SlugRelatedField(many=True, read_only=True, slug_field='name')
 
     class Meta:
         model = Project
         fields = ['id', 'title', 'summary', 'contest', 'contest_name', 'participant',
-                  'status', 'votes', 'score_percent', 'created_at']
+                  'status', 'votes', 'score_percent', 'weighted_score', 'tags', 'created_at']
         read_only_fields = ['participant', 'status', 'votes', 'created_at']
 
 
@@ -52,10 +54,14 @@ class ContestViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True)
     def results(self, request, pk=None):
         contest = self.get_object()
+        if contest.results_finalized:
+            snapshot = getattr(contest, 'result_snapshot', None)
+            if snapshot is not None:
+                return Response({'contest': contest.name, 'finalized': True, 'results': snapshot.data})
         projects = list(contest.projects.exclude(status='draft').select_related('participant'))
-        projects.sort(key=lambda p: (p.score_percent(), p.votes), reverse=True)
+        projects.sort(key=lambda p: (p.weighted_score_percent(), p.votes), reverse=True)
         data = [{'rank': i, 'id': p.id, 'title': p.title, 'participant': p.participant.username,
-                 'score_percent': p.score_percent(), 'votes': p.votes}
+                 'score_percent': p.weighted_score_percent(), 'votes': p.votes}
                 for i, p in enumerate(projects, 1)]
         return Response({'contest': contest.name, 'finalized': contest.results_finalized, 'results': data})
 
@@ -65,7 +71,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectSerializer
     search_fields = ['title', 'summary']
     ordering_fields = ['created_at', 'votes']
-    filterset_fields = ['contest', 'status']
+    filterset_fields = ['contest', 'status', 'tags']
     http_method_names = ['get', 'post', 'head', 'options']
 
     def get_permissions(self):
@@ -81,6 +87,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def vote(self, request, pk=None):
         project = self.get_object()
+        if project.contest.results_finalized:
+            return Response({'detail': 'Итоги подведены — голосование заморожено.'}, status=400)
         if project.is_member(request.user):
             return Response({'detail': 'Нельзя голосовать за проект своей команды.'}, status=400)
         vote, created = ProjectVote.objects.get_or_create(project=project, user=request.user)

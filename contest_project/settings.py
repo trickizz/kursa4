@@ -120,7 +120,11 @@ LOGGING = {
     'formatters': {'simple': {'format': '{levelname} {asctime} {name} {message}', 'style': '{'}},
     'handlers': {'console': {'class': 'logging.StreamHandler', 'formatter': 'simple'}},
     'root': {'handlers': ['console'], 'level': 'INFO'},
-    'loggers': {'django': {'handlers': ['console'], 'level': 'INFO', 'propagate': False}},
+    'loggers': {
+        'django': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+        'fontTools': {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
+        'fontTools.subset': {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
+    },
 }
 
 CACHES = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}}

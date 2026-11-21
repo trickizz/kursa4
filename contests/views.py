@@ -6,7 +6,7 @@ from django.views.generic import (ListView, DetailView, CreateView, UpdateView,
                                   DeleteView, TemplateView, FormView)
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
-from django.db.models import Count, Q, Sum, Avg
+from django.db.models import Count, Q, Sum, Avg, F
 from django.http import JsonResponse, Http404, HttpResponse, StreamingHttpResponse, FileResponse
 from django.views.decorators.http import require_POST
 from django.utils import timezone
@@ -136,7 +136,9 @@ class ProjectListView(ListView):
         elif sort == 'old':
             queryset = queryset.order_by('created_at')
         elif sort == 'score':
-            queryset = queryset.annotate(avg_score=Avg('evaluations__score')).order_by('-avg_score')
+            queryset = queryset.annotate(
+                avg_score=Avg(F('evaluations__score') * 100.0 / F('evaluations__criterion__max_score'))
+            ).order_by('-avg_score')
         return queryset.distinct()
 
     def get_context_data(self, **kwargs):
@@ -730,17 +732,24 @@ class RatingView(TemplateView):
         if cached is not None:
             context['rows'] = cached
             return context
-        users = (User.objects.annotate(proj_count=Count('projects', distinct=True),
-                                       votes_sum=Sum('projects__votes'),
-                                       ach_count=Count('achievements', distinct=True))
-                 .filter(proj_count__gt=0))
+        proj_rows = (Project.objects
+                     .annotate(pct=Avg(F('evaluations__score') * 100.0 / F('evaluations__criterion__max_score')))
+                     .values('id', 'participant_id', 'pct', 'votes'))
+        agg = {}
+        for row in proj_rows:
+            a = agg.setdefault(row['participant_id'], {'projects': 0, 'votes': 0, 'pcts': []})
+            a['projects'] += 1
+            a['votes'] += row['votes']
+            a['pcts'].append(row['pct'] or 0)
+        ach_counts = {r['user']: r['c'] for r in UserAchievement.objects.values('user').annotate(c=Count('id'))}
+        users = {u.pk: u for u in User.objects.filter(pk__in=agg)}
         rows = []
-        for user in users:
-            projects = Project.objects.filter(participant=user)
-            avg_percent = round(sum(p.score_percent() for p in projects) / len(projects), 1) if projects else 0
-            points = user.proj_count * 2 + (user.votes_sum or 0) + round(avg_percent / 10) + user.ach_count * 3
-            rows.append({'user': user, 'projects': user.proj_count, 'votes': user.votes_sum or 0,
-                         'avg_percent': avg_percent, 'achievements': user.ach_count, 'points': points})
+        for uid, a in agg.items():
+            avg_percent = round(sum(a['pcts']) / len(a['pcts']), 1)
+            ach = ach_counts.get(uid, 0)
+            points = a['projects'] * 2 + a['votes'] + round(avg_percent / 10) + ach * 3
+            rows.append({'user': users[uid], 'projects': a['projects'], 'votes': a['votes'],
+                         'avg_percent': avg_percent, 'achievements': ach, 'points': points})
         rows.sort(key=lambda r: r['points'], reverse=True)
         cache.set('rating_rows', rows, 60)
         context['rows'] = rows
@@ -1119,11 +1128,14 @@ def serve_media(request, path):
         raise Http404('Файл не найден')
     ctype, _ = mimetypes.guess_type(full)
     ctype = ctype or 'application/octet-stream'
-    inline = ctype.startswith('image/') or ctype == 'application/pdf'
+    inline = ctype in {'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'application/pdf'}
+    filename = os.path.basename(full).replace('"', '').replace('\r', '').replace('\n', '')
     response = FileResponse(open(full, 'rb'), content_type=ctype)
     disposition = 'inline' if inline else 'attachment'
-    response['Content-Disposition'] = f'{disposition}; filename="{os.path.basename(full)}"'
+    response['Content-Disposition'] = f'{disposition}; filename="{filename}"'
     response['X-Content-Type-Options'] = 'nosniff'
+    if inline and ctype != 'application/pdf':
+        response['Content-Security-Policy'] = "default-src 'none'"
     return response
 
 

@@ -1,4 +1,4 @@
-"""Сигналы: инвалидация кэша дашборда и генерация миниатюр обложек."""
+"""Сигналы: инвалидация кэшей дашборда/рейтинга и генерация миниатюр обложек."""
 import io
 
 from django.core.cache import cache
@@ -7,16 +7,20 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from PIL import Image
 
-from .models import Project, Contest, Evaluation
+from .models import Project, Contest, Evaluation, ProjectVote, UserAchievement
 
 DASHBOARD_CACHE_KEY = 'dashboard_stats'
+RATING_CACHE_KEY = 'rating_rows'
 
 
 @receiver([post_save, post_delete], sender=Project)
 @receiver([post_save, post_delete], sender=Contest)
 @receiver([post_save, post_delete], sender=Evaluation)
-def invalidate_dashboard(sender, **kwargs):
+@receiver([post_save, post_delete], sender=ProjectVote)
+@receiver([post_save, post_delete], sender=UserAchievement)
+def invalidate_caches(sender, **kwargs):
     cache.delete(DASHBOARD_CACHE_KEY)
+    cache.delete(RATING_CACHE_KEY)
 
 
 def _make_thumb(instance):
