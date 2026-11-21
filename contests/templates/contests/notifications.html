@@ -1,0 +1,35 @@
+{% extends 'contests/base.html' %}
+{% load query_utils %}
+{% block title %}Уведомления{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div><h1><i class="bi bi-bell text-primary me-2"></i>Уведомления</h1><p class="page-sub">События по вашим проектам, оценкам и команде</p></div>
+    {% if notif_unread %}
+    <form method="post" action="{% url 'notifications_read_all' %}">{% csrf_token %}
+        <input type="hidden" name="next" value="{% url 'notifications' %}">
+        <button class="btn btn-soft"><i class="bi bi-check2-all me-1"></i>Прочитать все</button>
+    </form>
+    {% endif %}
+</div>
+<div class="card fade-up"><div class="card-body p-0">
+    {% for n in notifications %}
+    <a href="{% url 'notification_go' n.pk %}" class="d-flex gap-3 px-3 py-3 border-bottom text-dark align-items-start {% if not n.is_read %}bg-white{% endif %}" style="{% if not n.is_read %}background:#eef2ff{% endif %}">
+        <span class="avatar-circle" style="width:38px;height:38px">{% if n.actor %}{{ n.actor.first_name|first|default:n.actor.username|first|upper }}{% else %}<i class="bi bi-bell"></i>{% endif %}</span>
+        <div class="flex-grow-1">
+            <div style="font-size:.92rem;{% if not n.is_read %}font-weight:700{% endif %}">{{ n.text }}</div>
+            <div class="comment-meta">{{ n.created_at|date:"d.m.Y H:i" }}{% if n.actor %} · {{ n.actor.username }}{% endif %}</div>
+        </div>
+        {% if not n.is_read %}<span class="badge bg-primary rounded-pill">new</span>{% endif %}
+    </a>
+    {% empty %}
+    <div class="empty-state"><div class="es-icon"><i class="bi bi-bell-slash"></i></div><h5>Уведомлений нет</h5><p>Здесь будут появляться события по вашим проектам и оценкам.</p></div>
+    {% endfor %}
+</div></div>
+{% if is_paginated %}
+<nav class="mt-4 d-flex justify-content-center"><ul class="pagination">
+    {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?{% modify_query page=page_obj.previous_page_number %}"><i class="bi bi-chevron-left"></i></a></li>{% endif %}
+    {% for num in paginator.page_range %}<li class="page-item {% if page_obj.number == num %}active{% endif %}"><a class="page-link" href="?{% modify_query page=num %}">{{ num }}</a></li>{% endfor %}
+    {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?{% modify_query page=page_obj.next_page_number %}"><i class="bi bi-chevron-right"></i></a></li>{% endif %}
+</ul></nav>
+{% endif %}
+{% endblock %}

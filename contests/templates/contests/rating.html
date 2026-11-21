@@ -1,0 +1,31 @@
+{% extends 'contests/base.html' %}
+{% block title %}Рейтинг участников{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div><h1><i class="bi bi-bar-chart-line text-primary me-2"></i>Рейтинг участников</h1>
+    <p class="page-sub">Очки = проекты×2 + полученные голоса + средний балл/10 + достижения×3</p></div>
+</div>
+<div class="card fade-up"><div class="card-body p-0">
+    {% if rows %}
+    <div class="table-responsive"><table class="table table-clean">
+        <thead><tr><th style="width:60px">Место</th><th>Участник</th><th>Проекты</th><th>Голоса</th><th>Ср. балл</th><th>Достижения</th><th>Очки</th></tr></thead>
+        <tbody>
+        {% for r in rows %}
+        <tr>
+            <td><span class="rank-badge {% if forloop.counter <= 3 %}rank-{{ forloop.counter }}{% endif %}">{{ forloop.counter }}</span></td>
+            <td><div class="d-flex align-items-center gap-2"><span class="avatar-circle" style="width:30px;height:30px;font-size:.75rem">{{ r.user.first_name|first|default:r.user.username|first|upper }}</span>
+                <b>{{ r.user.get_full_name|default:r.user.username }}</b>{% if forloop.counter == 1 %}<span class="medal">🥇{% elif forloop.counter == 2 %}🥈{% elif forloop.counter == 3 %}🥉{% endif %}</span></div></td>
+            <td>{{ r.projects }}</td>
+            <td><span class="meta-chip"><i class="bi bi-heart-fill text-danger"></i>{{ r.votes }}</span></td>
+            <td><span class="score-pill">{{ r.avg_percent }}%</span></td>
+            <td><span class="meta-chip"><i class="bi bi-award"></i>{{ r.achievements }}</span></td>
+            <td><b class="fs-6 text-primary">{{ r.points }}</b></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table></div>
+    {% else %}
+    <div class="empty-state"><div class="es-icon"><i class="bi bi-bar-chart"></i></div><h5>Рейтинг пока пуст</h5><p>Создайте первый проект, чтобы попасть в рейтинг!</p></div>
+    {% endif %}
+</div></div>
+{% endblock %}

@@ -25,66 +25,46 @@
         </div>
     </div>
     <div class="col-lg-8">
+        <div class="card fade-up mb-4">
+            <div class="card-header grad"><i class="bi bi-award me-2"></i>Достижения</div>
+            <div class="card-body">
+                <div class="row g-2">
+                    {% for item in achievements %}
+                    <div class="col-4 col-md-3 col-lg-2">
+                        <div class="achievement {% if item.earned %}earned{% else %}locked{% endif %}" title="{{ item.achievement.description }}">
+                            <span class="ach-icon"><i class="bi {{ item.achievement.icon }}"></i></span>
+                            <span class="ach-title">{{ item.achievement.title }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
         {% if role_info %}
         <div class="card fade-up mb-4">
-            <div class="card-header grad"><i class="bi {{ role_icon }} me-2"></i>Возможности роли «{{ role_label }}»</div>
+            <div class="card-header"><i class="bi {{ role_icon }} text-primary me-2"></i>Возможности роли «{{ role_label }}»</div>
             <div class="card-body">
-                <ul class="ability-list">
-                    {% for ability in role_info.abilities %}<li><i class="bi bi-check-circle-fill"></i>{{ ability }}</li>{% endfor %}
-                </ul>
+                <ul class="ability-list">{% for ability in role_info.abilities %}<li><i class="bi bi-check-circle-fill"></i>{{ ability }}</li>{% endfor %}</ul>
                 {% if not is_site_admin %}<div class="form-text mt-2">Роль может изменить администратор платформы.</div>{% endif %}
             </div>
         </div>
         {% endif %}
-
         {% if my_projects %}
         <div class="card fade-up mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-folder2 text-primary me-2"></i>Мои проекты</span>
-                <a href="{% url 'my_projects' %}" class="btn btn-soft btn-sm">Все</a>
-            </div>
-            <div class="card-body p-0">
-                {% for p in my_projects %}
-                <a href="{% url 'project_detail' p.pk %}" class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom text-dark">
-                    <span style="font-size:.9rem;font-weight:600">{{ p.title }}</span>
-                    <span class="status-badge status-{{ p.status }}">{{ p.get_status_display }}</span>
-                </a>
-                {% endfor %}
-            </div>
+            <div class="card-header d-flex justify-content-between align-items-center"><span><i class="bi bi-folder2 text-primary me-2"></i>Мои проекты</span><a href="{% url 'my_projects' %}" class="btn btn-soft btn-sm">Все</a></div>
+            <div class="card-body p-0">{% for p in my_projects %}<a href="{% url 'project_detail' p.pk %}" class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom text-dark"><span style="font-size:.9rem;font-weight:600">{{ p.title }}</span><span class="status-badge status-{{ p.status }}">{{ p.get_status_display }}</span></a>{% endfor %}</div>
         </div>
         {% endif %}
-
         {% if my_mentored %}
         <div class="card fade-up mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-mortarboard text-primary me-2"></i>Мои подопечные</span>
-                <a href="{% url 'my_mentored' %}" class="btn btn-soft btn-sm">Все</a>
-            </div>
-            <div class="card-body p-0">
-                {% for p in my_mentored %}
-                <a href="{% url 'project_detail' p.pk %}" class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom text-dark">
-                    <span style="font-size:.9rem;font-weight:600">{{ p.title }}</span>
-                    <span class="status-badge status-{{ p.status }}">{{ p.get_status_display }}</span>
-                </a>
-                {% endfor %}
-            </div>
+            <div class="card-header d-flex justify-content-between align-items-center"><span><i class="bi bi-mortarboard text-primary me-2"></i>Мои подопечные</span><a href="{% url 'my_mentored' %}" class="btn btn-soft btn-sm">Все</a></div>
+            <div class="card-body p-0">{% for p in my_mentored %}<a href="{% url 'project_detail' p.pk %}" class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom text-dark"><span style="font-size:.9rem;font-weight:600">{{ p.title }}</span><span class="status-badge status-{{ p.status }}">{{ p.get_status_display }}</span></a>{% endfor %}</div>
         </div>
         {% endif %}
-
         {% if my_evaluations %}
         <div class="card fade-up">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-clipboard-check text-primary me-2"></i>Последние оценки</span>
-                <a href="{% url 'my_evaluations' %}" class="btn btn-soft btn-sm">Все</a>
-            </div>
-            <div class="card-body p-0">
-                {% for e in my_evaluations %}
-                <a href="{% url 'project_detail' e.project.pk %}" class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom text-dark">
-                    <span style="font-size:.9rem;font-weight:600">{{ e.project.title|truncatechars:30 }}</span>
-                    <span class="score-pill">{{ e.score }} / {{ e.criterion.max_score }}</span>
-                </a>
-                {% endfor %}
-            </div>
+            <div class="card-header d-flex justify-content-between align-items-center"><span><i class="bi bi-clipboard-check text-primary me-2"></i>Последние оценки</span><a href="{% url 'my_evaluations' %}" class="btn btn-soft btn-sm">Все</a></div>
+            <div class="card-body p-0">{% for e in my_evaluations %}<a href="{% url 'project_detail' e.project.pk %}" class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom text-dark"><span style="font-size:.9rem;font-weight:600">{{ e.project.title|truncatechars:30 }}</span><span class="score-pill">{{ e.score }} / {{ e.criterion.max_score }}</span></a>{% endfor %}</div>
         </div>
         {% endif %}
     </div>
