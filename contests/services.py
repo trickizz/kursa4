@@ -1,11 +1,12 @@
-"""Бизнес-логика: уведомления, смена статусов с аудитом, достижения, @упоминания."""
+"""Бизнес-логика: уведомления (в т.ч. email), смена статусов с аудитом, достижения, @упоминания."""
 import re
 
+from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.mail import send_mail
 from django.urls import reverse
 
-from .models import (Notification, StatusChange, Achievement, UserAchievement,
-                     Project)
+from .models import (Notification, StatusChange, Achievement, UserAchievement, Project)
 
 ACHIEVEMENTS = [
     ('debut', 'Дебют', 'Создан первый проект', 'bi-rocket'),
@@ -20,22 +21,28 @@ ACHIEVEMENTS = [
 
 
 def notify(recipients, actor, text, url=''):
-    """Шлёт уведомление одному пользователю или списку. Инициатор сам себе не получает."""
+    """Уведомление в колокольчик + email (если включено). Инициатор сам себе не получает."""
     if recipients is None:
         return
     if isinstance(recipients, User):
         recipients = [recipients]
-    objs = []
+    objs, emails = [], []
     for user in recipients:
         if user is None or (actor is not None and user.pk == actor.pk):
             continue
         objs.append(Notification(recipient=user, actor=actor, text=text[:300], url=url))
+        if user.email:
+            emails.append(user.email)
     if objs:
         Notification.objects.bulk_create(objs)
+    if emails and getattr(settings, 'EMAIL_NOTIFICATIONS', True):
+        site = getattr(settings, 'SITE_URL', 'http://127.0.0.1:8000')
+        body = text + (('\n\nПодробнее: ' + site + url) if url else '')
+        send_mail('Конкурс проектов — уведомление', body,
+                  settings.DEFAULT_FROM_EMAIL, emails, fail_silently=True)
 
 
 def set_project_status(project, new_status, user=None):
-    """Единая точка смены статуса: сохраняет, пишет аудит, уведомляет команду, даёт ачивки."""
     old = project.status
     if old == new_status:
         return False
@@ -55,7 +62,6 @@ def set_project_status(project, new_status, user=None):
 
 
 def award(user, code):
-    """Выдаёт достижение, если его ещё нет, и уведомляет об этом."""
     if user is None:
         return
     achievement = Achievement.objects.filter(code=code).first()
@@ -67,7 +73,6 @@ def award(user, code):
 
 
 def parse_mentions(text):
-    """Находит @username в тексте комментария."""
     names = set(re.findall(r'@([A-Za-z0-9_]{3,30})', text))
     if not names:
         return []
