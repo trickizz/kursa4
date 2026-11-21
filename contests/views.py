@@ -882,3 +882,264 @@ def export_evaluations_view(request):
         messages.error(request, 'Нет прав')
         return redirect('home')
     return export_evaluations_csv(Evaluation.objects.select_related('project', 'expert', 'criterion'))
+
+
+# ---------------------------------------------------- модерация комментариев
+@login_required
+@require_POST
+def comment_edit(request, pk):
+    comment = get_object_or_404(Comment, pk=pk)
+    if comment.author != request.user and not is_organizer(request.user):
+        return JsonResponse({'success': False, 'message': 'Нет прав'}, status=403)
+    text = request.POST.get('text', '').strip()
+    if not text or len(text) > 2000:
+        return JsonResponse({'success': False, 'message': 'Некорректный текст'}, status=400)
+    comment.text = text
+    comment.save(update_fields=['text'])
+    return JsonResponse({'success': True, 'text': comment.text})
+
+
+@login_required
+@require_POST
+def comment_delete(request, pk):
+    comment = get_object_or_404(Comment, pk=pk)
+    if comment.author != request.user and not is_organizer(request.user):
+        return JsonResponse({'success': False, 'message': 'Нет прав'}, status=403)
+    project_pk = comment.project_id
+    comment.delete()
+    return JsonResponse({'success': True, 'project': project_pk})
+
+
+# ------------------------------------------------------------------ апелляции
+@login_required
+@require_POST
+def appeal_create(request, pk):
+    project = get_object_or_404(Project, pk=pk)
+    if not project.is_member(request.user):
+        messages.error(request, 'Апелляцию может подать только автор или команда проекта.')
+        return redirect('project_detail', pk=pk)
+    evaluation = get_object_or_404(Evaluation, pk=request.POST.get('evaluation'), project=project)
+    form = AppealForm(request.POST)
+    if form.is_valid():
+        appeal = form.save(commit=False)
+        appeal.project = project
+        appeal.evaluation = evaluation
+        appeal.author = request.user
+        appeal.save()
+        organizers = User.objects.filter(groups__name='Organizer') | User.objects.filter(is_superuser=True)
+        notify(organizers, request.user,
+               f'Апелляция на оценку проекта «{project.title}» (критерий «{evaluation.criterion.name}»).',
+               reverse('project_detail', args=[project.pk]))
+        messages.success(request, 'Апелляция отправлена организаторам.')
+    else:
+        messages.error(request, 'Опишите причину апелляции.')
+    return redirect('project_detail', pk=pk)
+
+
+@login_required
+@require_POST
+def appeal_resolve(request, pk):
+    appeal = get_object_or_404(Appeal, pk=pk)
+    if not is_organizer(request.user):
+        messages.error(request, 'Рассматривать апелляции может только организатор.')
+        return redirect('project_detail', pk=appeal.project_id)
+    form = AppealResolveForm(request.POST)
+    if form.is_valid():
+        appeal.status = form.cleaned_data['status']
+        appeal.resolution = form.cleaned_data['resolution']
+        appeal.resolved_by = request.user
+        appeal.resolved_at = timezone.now()
+        appeal.save()
+        notify(appeal.author, request.user,
+               f'Апелляция по проекту «{appeal.project.title}» {appeal.get_status_display().lower()}.',
+               reverse('project_detail', args=[appeal.project_id]))
+        messages.success(request, 'Апелляция рассмотрена.')
+    return redirect('project_detail', pk=appeal.project_id)
+
+
+# --------------------------------------------------------- клон и массовые действия
+@login_required
+@require_POST
+def contest_clone(request, pk):
+    contest = get_object_or_404(Contest, pk=pk)
+    if not is_organizer(request.user):
+        messages.error(request, 'Нет прав.')
+        return redirect('contest_detail', pk=pk)
+    stages = list(contest.stages.all())
+    criteria = list(contest.criteria.all())
+    contest.pk = None
+    contest.name = contest.name + ' (копия)'
+    contest.results_finalized = False
+    contest.finalized_at = None
+    contest.cover = None
+    contest.cover_thumb = None
+    contest.save()
+    for s in stages:
+        s.pk = None
+        s.contest = contest
+        s.save()
+    for c in criteria:
+        c.pk = None
+        c.contest = contest
+        c.save()
+    messages.success(request, 'Конкурс скопирован вместе с этапами и критериями.')
+    return redirect('contest_edit', pk=contest.pk)
+
+
+@login_required
+@require_POST
+def bulk_action(request, pk):
+    contest = get_object_or_404(Contest, pk=pk)
+    if not is_organizer(request.user):
+        messages.error(request, 'Нет прав.')
+        return redirect('contest_detail', pk=pk)
+    form = BulkActionForm(request.POST, contest=contest)
+    if not form.is_valid():
+        messages.error(request, 'Выберите проекты и действие.')
+        return redirect('contest_detail', pk=pk)
+    ids = form.cleaned_data['project_ids']
+    projects = contest.projects.filter(pk__in=ids)
+    action = form.cleaned_data['action']
+    count = 0
+    if action == 'status' and form.cleaned_data.get('status'):
+        for project in projects:
+            set_project_status(project, form.cleaned_data['status'], request.user)
+            count += 1
+    elif action == 'expert' and form.cleaned_data.get('expert'):
+        expert = form.cleaned_data['expert']
+        for project in projects:
+            ExpertAssignment.objects.get_or_create(project=project, expert=expert,
+                                                   defaults={'assigned_by': request.user})
+            notify(expert, request.user, f'Вам назначен проект для экспертизы «{project.title}».',
+                   reverse('project_detail', args=[project.pk]))
+            count += 1
+    messages.success(request, f'Массовое действие выполнено для {count} проектов.')
+    return redirect('contest_detail', pk=pk)
+
+
+# ------------------------------------------------------------- чек-лист наставника
+@login_required
+@require_POST
+def mentor_task_add(request, pk):
+    project = get_object_or_404(Project, pk=pk)
+    if project.mentor_id != request.user.pk:
+        messages.error(request, 'Задачи ставит только наставник проекта.')
+        return redirect('project_detail', pk=pk)
+    form = MentorTaskForm(request.POST)
+    if form.is_valid():
+        task = form.save(commit=False)
+        task.project = project
+        task.mentor = request.user
+        task.save()
+        notify(project.all_members(), request.user,
+               f'Наставник добавил задачу к проекту «{project.title}».',
+               reverse('project_detail', args=[project.pk]))
+    return redirect('project_detail', pk=pk)
+
+
+@login_required
+@require_POST
+def mentor_task_toggle(request, pk):
+    task = get_object_or_404(MentorTask, pk=pk)
+    if task.project.mentor_id != request.user.pk and not task.project.is_member(request.user):
+        return JsonResponse({'success': False}, status=403)
+    task.done = not task.done
+    task.save(update_fields=['done'])
+    return JsonResponse({'success': True, 'done': task.done})
+
+
+@login_required
+@require_POST
+def mentor_task_delete(request, pk):
+    task = get_object_or_404(MentorTask, pk=pk)
+    project_pk = task.project_id
+    if task.project.mentor_id != request.user.pk:
+        messages.error(request, 'Нет прав.')
+        return redirect('project_detail', pk=project_pk)
+    task.delete()
+    return redirect('project_detail', pk=project_pk)
+
+
+# ------------------------------------------------------------------ XLSX экспорт
+@login_required
+def export_xlsx(request):
+    if not is_organizer(request.user):
+        messages.error(request, 'Нет прав')
+        return redirect('home')
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Проекты'
+    ws.append(['ID', 'Название', 'Конкурс', 'Участник', 'Наставник', 'Статус', 'Балл %', 'Голоса', 'Теги'])
+    fill = PatternFill('solid', fgColor='6366F1')
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = fill
+    for p in Project.objects.select_related('contest', 'participant', 'mentor').prefetch_related('tags'):
+        ws.append([p.id, p.title, p.contest.name, p.participant.username,
+                   p.mentor.username if p.mentor else '—', p.get_status_display(),
+                   p.weighted_score_percent(), p.votes, ', '.join(t.name for t in p.tags.all())])
+    ws2 = wb.create_sheet('Оценки')
+    ws2.append(['Проект', 'Эксперт', 'Критерий', 'Балл', 'Максимум', 'Комментарий', 'Дата'])
+    for cell in ws2[1]:
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = fill
+    for e in Evaluation.objects.select_related('project', 'expert', 'criterion'):
+        ws2.append([e.project.title, e.expert.username, e.criterion.name, e.score,
+                    e.criterion.max_score, e.comment, e.created_at.strftime('%d.%m.%Y')])
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename="projects.xlsx"'
+    wb.save(response)
+    return response
+
+
+# ------------------------------------------------------------------ healthcheck
+def healthz(request):
+    db_ok = True
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT 1')
+            cursor.fetchone()
+    except Exception:
+        db_ok = False
+    return JsonResponse({'status': 'ok' if db_ok else 'degraded', 'db': db_ok,
+                         'time': timezone.now().isoformat()})
+
+
+# ------------------------------------------------------- безопасная отдача медиа
+def serve_media(request, path):
+    import mimetypes
+    from django.utils._os import safe_join
+    try:
+        full = safe_join(settings.MEDIA_ROOT, path)
+    except Exception:
+        raise Http404('Недопустимый путь')
+    if not os.path.isfile(full):
+        raise Http404('Файл не найден')
+    ctype, _ = mimetypes.guess_type(full)
+    ctype = ctype or 'application/octet-stream'
+    inline = ctype.startswith('image/') or ctype == 'application/pdf'
+    response = FileResponse(open(full, 'rb'), content_type=ctype)
+    disposition = 'inline' if inline else 'attachment'
+    response['Content-Disposition'] = f'{disposition}; filename="{os.path.basename(full)}"'
+    response['X-Content-Type-Options'] = 'nosniff'
+    return response
+
+
+# ------------------------------------------------------------------ SSE уведомления
+@login_required
+def notifications_stream(request):
+    def event_stream():
+        for _ in range(12):
+            unread = Notification.objects.filter(recipient=request.user, is_read=False)
+            latest = unread.first()
+            payload = {'unread': unread.count(),
+                       'latest_id': latest.id if latest else 0,
+                       'latest_text': latest.text if latest else ''}
+            yield f'data: {json.dumps(payload, ensure_ascii=False)}\n\n'
+            time.sleep(2)
+    response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
+    response['Cache-Control'] = 'no-cache'
+    response['X-Accel-Buffering'] = 'no'
+    return response
